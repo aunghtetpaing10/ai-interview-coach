@@ -1,0 +1,40 @@
+import { z } from "zod";
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  POSTGRES_URL: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_REALTIME_MODEL: z.string().min(1).default("gpt-realtime"),
+  OPENAI_RESPONSES_MODEL: z.string().min(1).default("gpt-5.2"),
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+  POSTHOG_KEY: z.string().min(1).optional(),
+  POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
+  SENTRY_AUTH_TOKEN: z.string().min(1).optional(),
+  SENTRY_ORG: z.string().min(1).optional(),
+  SENTRY_PROJECT: z.string().min(1).optional(),
+});
+
+export type AppEnv = z.infer<typeof envSchema>;
+
+export function parseEnv(input: Record<string, string | undefined>): AppEnv {
+  const parsed = envSchema.safeParse(input);
+
+  if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
+
+    throw new Error(`Invalid environment configuration: ${details}`);
+  }
+
+  return parsed.data;
+}
+
+export function getEnv() {
+  return parseEnv(process.env);
+}
