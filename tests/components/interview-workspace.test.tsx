@@ -22,7 +22,12 @@ describe("InterviewWorkspace", () => {
 
     render(<InterviewWorkspace initialSession={createDemoInterviewSession()} />);
 
-    await user.click(screen.getAllByRole("button", { name: /start live session/i })[0]);
+    const startButton = screen.getAllByRole("button", {
+      name: /start live session/i,
+    })[0];
+
+    await user.click(startButton);
+    expect(startButton).toBeDisabled();
 
     const connectionMessages = await screen.findAllByText(
       /mock transport connected/i,
@@ -31,6 +36,7 @@ describe("InterviewWorkspace", () => {
     );
 
     expect(connectionMessages[0]).toBeInTheDocument();
+    expect(startButton).toBeDisabled();
 
     const draftAreas = screen.getAllByPlaceholderText(/draft your answer to/i);
 

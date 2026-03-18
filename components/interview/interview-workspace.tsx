@@ -56,6 +56,8 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     state.status === "connecting" ||
     state.status === "live" ||
     state.status === "paused";
+  const startDisabled =
+    state.status === "connecting" || state.status === "live";
 
   useEffect(() => {
     if (state.status !== "live") {
@@ -84,6 +86,10 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
   function handleSessionStart() {
     if (state.status === "paused") {
       dispatch({ type: "session-resumed" });
+      return;
+    }
+
+    if (state.status === "connecting" || state.status === "live") {
       return;
     }
 
@@ -180,6 +186,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
                 <button
                   type="button"
                   onClick={handleSessionStart}
+                  disabled={startDisabled}
                   className={cn(
                     buttonVariants({
                       size: "sm",

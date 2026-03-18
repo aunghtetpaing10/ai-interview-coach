@@ -53,6 +53,25 @@ describe("interview session state", () => {
     expect(afterSubmit.activePrompt).toContain("hardest bottlenecks");
   });
 
+  it("ignores duplicate connection requests while the session is already starting or live", () => {
+    const initial = createDemoInterviewSession();
+    const connecting = interviewSessionReducer(initial, {
+      type: "connection-requested",
+    });
+    const duplicateConnecting = interviewSessionReducer(connecting, {
+      type: "connection-requested",
+    });
+    const live = interviewSessionReducer(connecting, {
+      type: "connection-established",
+    });
+    const duplicateLive = interviewSessionReducer(live, {
+      type: "connection-requested",
+    });
+
+    expect(duplicateConnecting).toEqual(connecting);
+    expect(duplicateLive).toEqual(live);
+  });
+
   it("ends the session once the timer reaches the configured duration", () => {
     const initial = createDemoInterviewSession();
     const live = interviewSessionReducer(

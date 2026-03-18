@@ -162,6 +162,10 @@ export function interviewSessionReducer(
 
       return resetForMode(state, action.mode);
     case "connection-requested":
+      if (state.status === "connecting" || state.status === "live") {
+        return state;
+      }
+
       return {
         ...state,
         status: "connecting",

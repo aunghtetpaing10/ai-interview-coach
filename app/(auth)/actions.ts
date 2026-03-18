@@ -23,7 +23,7 @@ export async function signInAction(
     };
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient({ writeCookies: true });
 
   if (!supabase) {
     return {
@@ -59,7 +59,7 @@ export async function signUpAction(
     };
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient({ writeCookies: true });
 
   if (!supabase) {
     return {
