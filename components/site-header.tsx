@@ -28,6 +28,12 @@ export function SiteHeader() {
             TDD-first
           </Badge>
           <Link
+            href="/onboarding"
+            className={cn(buttonVariants({ variant: "ghost", className: "rounded-full" }))}
+          >
+            Onboarding
+          </Link>
+          <Link
             href="/dashboard"
             className={cn(buttonVariants({ variant: "ghost", className: "rounded-full" }))}
           >

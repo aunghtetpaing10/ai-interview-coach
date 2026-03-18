@@ -1,16 +1,11 @@
 "use server";
 
 import type { OnboardingSubmissionState } from "@/lib/intake/types";
-import {
-  buildOnboardingSummary,
-  createEmptyOnboardingDraft,
-} from "@/lib/intake/summary";
-import {
-  safeParseOnboardingDraftFromFormData,
-} from "@/lib/intake/validation";
+import { buildOnboardingSummary } from "@/lib/intake/summary";
+import { safeParseOnboardingDraftFromFormData } from "@/lib/intake/validation";
 
 export async function submitOnboardingDraft(
-  _previousState: OnboardingSubmissionState,
+  previousState: OnboardingSubmissionState,
   formData: FormData,
 ): Promise<OnboardingSubmissionState> {
   const parsed = safeParseOnboardingDraftFromFormData(formData);
@@ -19,7 +14,7 @@ export async function submitOnboardingDraft(
     return {
       status: "error",
       message: parsed.message,
-      summary: buildOnboardingSummary(createEmptyOnboardingDraft()),
+      summary: previousState.summary,
       fieldErrors: parsed.fieldErrors,
     };
   }

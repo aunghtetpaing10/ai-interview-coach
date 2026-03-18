@@ -2,6 +2,7 @@
 
 import { useActionState, type ReactNode } from "react";
 import { ArrowRight, FileUp, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,14 @@ import { SummaryPanel } from "@/components/intake/summary-panel";
 
 const demoDraft = createDemoOnboardingDraft();
 const initialOnboardingState = createInitialOnboardingState();
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return <p className="text-sm text-rose-600">{message}</p>;
+}
 
 function StepBadge({ step, label }: { step: string; label: string }) {
   return (
@@ -81,10 +90,11 @@ export function OnboardingFlow() {
   );
 
   const currentState: OnboardingSubmissionState = state;
+  const fieldErrors = currentState.fieldErrors;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-      <form action={formAction} className="space-y-6">
+      <form action={formAction} className="space-y-6" aria-busy={pending}>
         <section className="grid gap-3 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.3)]">
           <Badge className="w-fit rounded-full bg-slate-950 text-white">
             Onboarding draft
@@ -112,12 +122,22 @@ export function OnboardingFlow() {
                 name="roleTitle"
                 defaultValue={demoDraft.roleTitle}
                 placeholder="Backend Software Engineer"
+                aria-invalid={fieldErrors.roleTitle ? true : undefined}
+                className={cn(
+                  fieldErrors.roleTitle ? "border-rose-300 ring-rose-200" : "",
+                )}
               />
+              <FieldError message={fieldErrors.roleTitle} />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Seniority</span>
               <Select name="seniority" defaultValue={demoDraft.seniority}>
-                <SelectTrigger>
+                <SelectTrigger
+                  aria-invalid={fieldErrors.seniority ? true : undefined}
+                  className={cn(
+                    fieldErrors.seniority ? "border-rose-300 ring-rose-200" : "",
+                  )}
+                >
                   <SelectValue placeholder="Select a level" />
                 </SelectTrigger>
                 <SelectContent>
@@ -128,11 +148,17 @@ export function OnboardingFlow() {
                   <SelectItem value="staff">Staff</SelectItem>
                 </SelectContent>
               </Select>
+              <FieldError message={fieldErrors.seniority} />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Company type</span>
               <Select name="companyType" defaultValue={demoDraft.companyType}>
-                <SelectTrigger>
+                <SelectTrigger
+                  aria-invalid={fieldErrors.companyType ? true : undefined}
+                  className={cn(
+                    fieldErrors.companyType ? "border-rose-300 ring-rose-200" : "",
+                  )}
+                >
                   <SelectValue placeholder="Select the company shape" />
                 </SelectTrigger>
                 <SelectContent>
@@ -143,6 +169,7 @@ export function OnboardingFlow() {
                   <SelectItem value="agency">Agency</SelectItem>
                 </SelectContent>
               </Select>
+              <FieldError message={fieldErrors.companyType} />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Focus areas</span>
@@ -150,7 +177,12 @@ export function OnboardingFlow() {
                 name="focusAreas"
                 defaultValue={demoDraft.focusAreas.join(", ")}
                 placeholder="APIs, ownership, reliability"
+                aria-invalid={fieldErrors.focusAreas ? true : undefined}
+                className={cn(
+                  fieldErrors.focusAreas ? "border-rose-300 ring-rose-200" : "",
+                )}
               />
+              <FieldError message={fieldErrors.focusAreas} />
             </label>
           </div>
         </SectionShell>
@@ -170,9 +202,11 @@ export function OnboardingFlow() {
                   name="resumeFile"
                   type="file"
                   accept=".pdf,.doc,.docx,.txt,.md"
+                  aria-invalid={fieldErrors.resumeFile ? true : undefined}
                   className="border-0 bg-transparent p-0 shadow-none file:mr-3 file:rounded-full file:border-0 file:bg-slate-950 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
                 />
               </div>
+              <FieldError message={fieldErrors.resumeFile} />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">
@@ -183,7 +217,9 @@ export function OnboardingFlow() {
                 defaultValue={demoDraft.resumeNotes}
                 placeholder="Paste a compact resume summary or bullet points here."
                 className="min-h-32"
+                aria-invalid={fieldErrors.resumeNotes ? true : undefined}
               />
+              <FieldError message={fieldErrors.resumeNotes} />
             </label>
             <p className="text-sm leading-6 text-slate-500">
               Supported shell formats: PDF, DOCX, TXT, and Markdown. If no file
@@ -206,7 +242,12 @@ export function OnboardingFlow() {
                   name="companyName"
                   defaultValue={demoDraft.companyName}
                   placeholder="Northstar"
+                  aria-invalid={fieldErrors.companyName ? true : undefined}
+                  className={cn(
+                    fieldErrors.companyName ? "border-rose-300 ring-rose-200" : "",
+                  )}
                 />
+                <FieldError message={fieldErrors.companyName} />
               </label>
               <label className="space-y-2">
                 <span className="text-sm font-medium text-slate-700">Job title</span>
@@ -214,7 +255,12 @@ export function OnboardingFlow() {
                   name="jobTitle"
                   defaultValue={demoDraft.jobTitle}
                   placeholder="Software Engineer"
+                  aria-invalid={fieldErrors.jobTitle ? true : undefined}
+                  className={cn(
+                    fieldErrors.jobTitle ? "border-rose-300 ring-rose-200" : "",
+                  )}
                 />
+                <FieldError message={fieldErrors.jobTitle} />
               </label>
             </div>
             <label className="space-y-2">
@@ -223,7 +269,12 @@ export function OnboardingFlow() {
                 name="jobUrl"
                 defaultValue={demoDraft.jobUrl}
                 placeholder="https://example.com/jobs/backend-engineer"
+                aria-invalid={fieldErrors.jobUrl ? true : undefined}
+                className={cn(
+                  fieldErrors.jobUrl ? "border-rose-300 ring-rose-200" : "",
+                )}
               />
+              <FieldError message={fieldErrors.jobUrl} />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Job description</span>
@@ -231,8 +282,13 @@ export function OnboardingFlow() {
                 name="jobDescription"
                 defaultValue={demoDraft.jobDescription}
                 placeholder="Paste the full job description here."
-                className="min-h-40"
+                className={cn(
+                  "min-h-40",
+                  fieldErrors.jobDescription ? "border-rose-300 ring-rose-200" : "",
+                )}
+                aria-invalid={fieldErrors.jobDescription ? true : undefined}
               />
+              <FieldError message={fieldErrors.jobDescription} />
             </label>
           </div>
         </SectionShell>
@@ -250,6 +306,7 @@ export function OnboardingFlow() {
             </div>
             <Button
               type="submit"
+              disabled={pending}
               className="h-11 rounded-full bg-slate-950 px-6 text-white hover:bg-slate-800"
             >
               Save onboarding draft
