@@ -63,7 +63,11 @@ export interface InterviewSessionState {
 export type InterviewSessionAction =
   | { type: "mode-changed"; mode: InterviewMode }
   | { type: "connection-requested" }
-  | { type: "connection-established" }
+  | {
+      type: "connection-established";
+      realtime?: RealtimeSessionSnapshot;
+      connectionMessage?: string;
+    }
   | { type: "connection-failed"; reason: string }
   | { type: "session-paused" }
   | { type: "session-resumed" }
