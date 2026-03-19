@@ -6,10 +6,17 @@ import { createDemoInterviewSession } from "@/lib/interview-session/fixtures";
 
 const connectBrowserRealtimeSessionMock = vi.hoisted(() => vi.fn());
 const createBrowserRealtimeSnapshotMock = vi.hoisted(() => vi.fn());
+const pushMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/openai/browser-realtime", () => ({
   connectBrowserRealtimeSession: connectBrowserRealtimeSessionMock,
   createBrowserRealtimeSnapshot: createBrowserRealtimeSnapshotMock,
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: pushMock,
+  }),
 }));
 
 describe("InterviewWorkspace", () => {
@@ -25,6 +32,7 @@ describe("InterviewWorkspace", () => {
     await user.click(screen.getByRole("tab", { name: /behavioral/i }));
 
     expect(screen.getAllByText(/inherited something messy/i)[0]).toBeInTheDocument();
+    expect(pushMock).toHaveBeenCalledWith("/interview?mode=behavioral");
   });
 
   it("connects the realtime transport and still supports text fallback submission", async () => {
