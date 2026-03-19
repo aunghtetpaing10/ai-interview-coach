@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
+import { requireWorkspaceUser } from "@/lib/auth/session";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionTitle } from "@/components/section-title";
 import { OnboardingFlow } from "@/components/intake/onboarding-flow";
+import { createInitialOnboardingState } from "@/lib/intake/state";
+import { loadOnboardingDraftForUser } from "@/lib/intake/persistence";
 
 export const metadata = {
   title: "Onboarding",
@@ -11,17 +14,21 @@ export const metadata = {
     "Set up your target role, resume shell, and job description for grounded AI interview coaching.",
 };
 
-export default function OnboardingPage() {
+export default async function OnboardingPage() {
+  const user = await requireWorkspaceUser("/onboarding");
+  const draft = await loadOnboardingDraftForUser(user.id);
+  const initialState = createInitialOnboardingState(draft);
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(22,56,212,0.12),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(236,120,67,0.12),_transparent_24%),linear-gradient(180deg,_#f7f7f2_0%,_#f0ede4_60%,_#f7f4ed_100%)]">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-10">
         <div className="flex items-center justify-between">
           <Link
-            href="/"
+            href="/workspace"
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950"
           >
             <ArrowLeft className="size-4" />
-            Back to home
+            Back to workspace
           </Link>
           <Badge className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white">
             Intake flow
@@ -46,22 +53,21 @@ export default function OnboardingPage() {
                   <Sparkles className="size-5" />
                 </div>
                 <div>
-                  <p className="font-medium">Mock-safe by design</p>
+                  <p className="font-medium">Authenticated persistence</p>
                   <p className="text-sm text-slate-300">
-                    No external credentials or storage are required for this slice.
+                    Saved values are scoped to {user.email ?? "the current user"}.
                   </p>
                 </div>
               </div>
               <p className="text-sm leading-6 text-slate-300">
-                The flow validates input locally, then uses a server action to
-                return a structured summary that the candidate can review before
-                starting practice.
+                The flow validates input, persists it to the product data model,
+                and rehydrates the form from saved user-owned rows on reload.
               </p>
             </CardContent>
           </Card>
         </section>
 
-        <OnboardingFlow />
+        <OnboardingFlow initialDraft={draft} initialState={initialState} />
       </div>
     </main>
   );
