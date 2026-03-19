@@ -46,8 +46,11 @@ describe("seeded interview repository", () => {
           status: "completed",
           title: "Notification service drill",
           overallScore: 82,
+          durationSeconds: 20 * 60,
           startedAt: new Date("2026-03-18T00:00:00.000Z"),
           endedAt: new Date("2026-03-18T00:20:00.000Z"),
+          createdAt: new Date("2026-03-18T00:00:00.000Z"),
+          updatedAt: new Date("2026-03-18T00:20:00.000Z"),
         },
       ],
     });

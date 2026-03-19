@@ -18,7 +18,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 import {
-  DEMO_WORKSPACE_USER,
   getWorkspaceUser,
   requireWorkspaceUser,
 } from "@/lib/auth/session";
@@ -29,10 +28,18 @@ describe("workspace session helpers", () => {
     redirectMock.mockClear();
   });
 
-  it("returns a deterministic demo user when Supabase is not configured", async () => {
+  it("returns null when Supabase is not configured", async () => {
     createSupabaseServerClientMock.mockResolvedValue(null);
 
-    await expect(getWorkspaceUser()).resolves.toEqual(DEMO_WORKSPACE_USER);
+    await expect(getWorkspaceUser()).resolves.toBeNull();
+  });
+
+  it("redirects when auth is required but Supabase is not configured", async () => {
+    createSupabaseServerClientMock.mockResolvedValue(null);
+
+    await expect(requireWorkspaceUser("/workspace")).rejects.toThrow(
+      "REDIRECT:/sign-in?next=%2Fworkspace",
+    );
   });
 
   it("redirects anonymous users when Supabase is configured but no session exists", async () => {
