@@ -1,8 +1,10 @@
 import type {
   InterviewMode,
   InterviewSessionRow,
+  JobTargetRow,
   ProfileRow,
   QuestionBankRow,
+  ResumeAssetRow,
   RubricDimensionRow,
   TargetRoleRow,
 } from "@/db/schema";
@@ -11,6 +13,8 @@ import { INTERVIEW_SEED } from "@/db/seed";
 export interface WorkspaceSnapshot {
   profile: ProfileRow | null;
   targetRole: TargetRoleRow | null;
+  jobTarget: JobTargetRow | null;
+  resumeAsset: ResumeAssetRow | null;
   activeMode: InterviewMode;
   questionCount: number;
   rubricCount: number;
@@ -32,6 +36,8 @@ export function createSeededInterviewRepository(
     profile?: ProfileRow | null;
     targetRoles?: readonly TargetRoleRow[];
     sessions?: readonly InterviewSessionRow[];
+    jobTarget?: JobTargetRow | null;
+    resumeAsset?: ResumeAssetRow | null;
   } = {},
 ): InterviewDataRepository {
   const resolvedSeed = seed ?? INTERVIEW_SEED;
@@ -67,6 +73,8 @@ export function createSeededInterviewRepository(
       return {
         profile: workspace.profile ?? null,
         targetRole: activeTargetRole,
+        jobTarget: workspace.jobTarget ?? null,
+        resumeAsset: workspace.resumeAsset ?? null,
         activeMode: activeTargetRole ? "system-design" : "behavioral",
         questionCount: questions.length,
         rubricCount: rubrics.length,

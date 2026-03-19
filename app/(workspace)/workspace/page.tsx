@@ -1,14 +1,18 @@
-import { Clock3, LayoutDashboard, Sparkles, Target, Workflow } from "lucide-react";
-import { createSeededInterviewRepository } from "@/lib/data/repository";
+import Link from "next/link";
+import { ArrowRight, Clock3, LayoutDashboard, Sparkles, Target, Workflow } from "lucide-react";
+import { requireWorkspaceUser } from "@/lib/auth/session";
+import { createPostgresInterviewRepository } from "@/lib/data/database-repository";
 import { getWorkspaceMetricCopy } from "@/lib/data/workspace";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
-const repository = createSeededInterviewRepository();
+import { cn } from "@/lib/utils";
 
 export default async function WorkspacePage() {
-  const snapshot = await repository.getWorkspaceSnapshot("user_1");
+  const user = await requireWorkspaceUser("/workspace");
+  const repository = createPostgresInterviewRepository();
+  const snapshot = await repository.getWorkspaceSnapshot(user.id);
   const metrics = getWorkspaceMetricCopy(snapshot);
 
   return (
@@ -20,10 +24,10 @@ export default async function WorkspacePage() {
               Authenticated shell
             </Badge>
             <CardTitle className="text-4xl tracking-[-0.05em]">
-              Welcome back, {snapshot.profile?.fullName ?? "candidate"}.
+              Welcome back, {snapshot.profile?.fullName ?? user.email ?? "candidate"}.
             </CardTitle>
             <CardDescription className="max-w-2xl text-base leading-7 text-slate-600">
-              This protected workspace is already shaped around a user profile, target role, seeded question bank, and rubric dimensions.
+              This workspace now loads your saved role context, question bank, interview history, and resume metadata from persisted data instead of seed fixtures.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -43,25 +47,25 @@ export default async function WorkspacePage() {
 
         <Card className="border-slate-200/60 bg-white/85">
           <CardHeader>
-            <CardDescription>Foundation status</CardDescription>
-            <CardTitle className="text-2xl">Ready for Supabase wiring</CardTitle>
+            <CardDescription>Workspace status</CardDescription>
+            <CardTitle className="text-2xl">Product loop foundation is live</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm leading-6 text-slate-600">
             <div className="flex items-start gap-3">
               <LayoutDashboard className="mt-0.5 size-4 text-[#1638d4]" />
-              <p>Workspace layout is protected by a server-side auth gate.</p>
+              <p>Workspace access is bound to the authenticated Supabase user.</p>
             </div>
             <div className="flex items-start gap-3">
               <Target className="mt-0.5 size-4 text-[#1638d4]" />
-              <p>Seed data already covers modes, rubric keys, prompts, and eval cases.</p>
+              <p>Reference data still seeds prompts and rubric dimensions through the database.</p>
             </div>
             <div className="flex items-start gap-3">
               <Workflow className="mt-0.5 size-4 text-[#1638d4]" />
-              <p>Repository helpers are shaped for a future swap to live Supabase reads.</p>
+              <p>Repository helpers now read real user-owned rows instead of hard-coded fixtures.</p>
             </div>
             <div className="flex items-start gap-3">
               <Sparkles className="mt-0.5 size-4 text-[#1638d4]" />
-              <p>All of this can be extended without touching the public landing page.</p>
+              <p>The next steps are onboarding persistence, sessions, reports, and voice runtime.</p>
             </div>
           </CardContent>
         </Card>
@@ -77,16 +81,51 @@ export default async function WorkspacePage() {
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <Clock3 className="size-4 text-[#1638d4]" />
               <p className="text-sm text-slate-600">
-                Recent sessions are stored as typed rows, but the live DB adapter can be introduced later with the same interface.
+                Recent sessions are stored as typed rows and drive this workspace snapshot directly.
               </p>
             </div>
+            {snapshot.jobTarget ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-500">Active job target</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">
+                  {snapshot.jobTarget.companyName} | {snapshot.jobTarget.jobTitle}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600 line-clamp-3">
+                  {snapshot.jobTarget.jobDescription}
+                </p>
+              </div>
+            ) : null}
+            {snapshot.resumeAsset ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-500">Latest resume asset</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">
+                  {snapshot.resumeAsset.fileName}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {snapshot.resumeAsset.summary}
+                </p>
+              </div>
+            ) : (
+              <Link
+                href="/onboarding"
+                className={cn(
+                  buttonVariants({
+                    variant: "outline",
+                    className: "w-full rounded-full",
+                  }),
+                )}
+              >
+                Finish onboarding
+                <ArrowRight className="size-4" />
+              </Link>
+            )}
           </CardContent>
         </Card>
 
         <Card className="border-slate-200/60 bg-white/85">
           <CardHeader>
             <CardDescription>Question preview</CardDescription>
-            <CardTitle className="text-2xl">Seeded prompts</CardTitle>
+            <CardTitle className="text-2xl">Reference prompts</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {snapshot.questionPreview.map((question, index) => (
