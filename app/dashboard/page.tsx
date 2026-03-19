@@ -10,7 +10,7 @@ import { createReportService } from "@/lib/report-service/report-service";
 import { SectionTitle } from "@/components/section-title";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -69,24 +69,28 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-4">
-            <Button
-              asChild
-              className="rounded-full bg-white text-slate-950 hover:bg-slate-100"
+            <Link
+              href="/interview"
+              className={cn(
+                buttonVariants({
+                  className: "rounded-full bg-white text-slate-950 hover:bg-slate-100",
+                }),
+              )}
             >
-              <Link href="/interview">
-                Start a live interview
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="rounded-full border-white/20 bg-white/5 text-white hover:bg-white/10"
+              Start a live interview
+              <ArrowRight className="size-4" />
+            </Link>
+            <Link
+              href={model.latestReport ? `/reports/${model.latestReport.id}` : "/reports"}
+              className={cn(
+                buttonVariants({
+                  variant: "outline",
+                  className: "rounded-full border-white/20 bg-white/5 text-white hover:bg-white/10",
+                }),
+              )}
             >
-              <Link href={model.latestReport ? `/reports/${model.latestReport.id}` : "/reports"}>
-                Review latest scorecard
-              </Link>
-            </Button>
+              Review latest scorecard
+            </Link>
           </div>
         </div>
         <Card className="border-white/10 bg-white/5 text-white">
