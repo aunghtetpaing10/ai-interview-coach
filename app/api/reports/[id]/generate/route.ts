@@ -6,7 +6,7 @@ import { createReportGenerationQueue } from "@/lib/inngest/report-generation";
 
 export async function POST(
   _request: Request,
-  context: { params: Promise<{ sessionId: string }> },
+  context: { params: Promise<{ id: string }> },
 ) {
   const user = await getWorkspaceUser();
 
@@ -14,10 +14,10 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const { sessionId } = await context.params;
+  const { id } = await context.params;
   const reportService = createReportService(createPostgresReportStore());
   const queue = createReportGenerationQueue(reportService);
-  const result = await queue.enqueueReportGeneration(user.id, sessionId);
+  const result = await queue.enqueueReportGeneration(user.id, id);
 
   return NextResponse.json(result, { status: 202 });
 }

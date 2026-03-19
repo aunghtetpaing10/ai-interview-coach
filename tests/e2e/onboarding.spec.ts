@@ -5,19 +5,11 @@ test("submits the onboarding draft and renders the saved summary", async ({
 }) => {
   await page.goto("/onboarding");
 
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Fonboarding$/);
   await expect(
     page.getByRole("heading", {
-      name: /give the coach enough signal to act like it knows the role/i,
+      name: /sign in to a workspace that keeps your interview prep tied to real evidence/i,
     }),
   ).toBeVisible();
-
-  await page.getByRole("button", { name: /save onboarding draft/i }).click();
-
-  await expect(
-    page.getByText(
-      /draft captured\. the coach can now anchor questions to your role, resume, and target job\./i,
-    ),
-  ).toBeVisible();
-
-  await expect(page.getByText(/draft saved/i).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
 });

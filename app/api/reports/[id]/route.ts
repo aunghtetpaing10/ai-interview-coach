@@ -5,7 +5,7 @@ import { createReportService } from "@/lib/report-service/report-service";
 
 export async function GET(
   _request: Request,
-  context: { params: Promise<{ reportId: string }> },
+  context: { params: Promise<{ id: string }> },
 ) {
   const user = await getWorkspaceUser();
 
@@ -13,9 +13,9 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const { reportId } = await context.params;
+  const { id } = await context.params;
   const reportService = createReportService(createPostgresReportStore());
-  const report = await reportService.getReportById(user.id, reportId);
+  const report = await reportService.getReportById(user.id, id);
 
   if (!report) {
     return NextResponse.json({ error: "Report not found." }, { status: 404 });

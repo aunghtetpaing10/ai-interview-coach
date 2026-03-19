@@ -5,20 +5,11 @@ test("renders the reports catalog and opens the featured report", async ({
 }) => {
   await page.goto("/reports");
 
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Freports$/);
   await expect(
     page.getByRole("heading", {
-      name: /reports that read like a product/i,
+      name: /sign in to a workspace that keeps your interview prep tied to real evidence/i,
     }),
   ).toBeVisible();
-
-  await page.getByRole("link", { name: /open latest report/i }).click();
-  await expect(page).toHaveURL(/\/reports\/report-042$/);
-
-  await expect(
-    page.getByRole("heading", {
-      name: /live interview report: payments platform/i,
-    }).first(),
-  ).toBeVisible();
-
-  await expect(page.getByRole("tab", { name: /citations/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
 });

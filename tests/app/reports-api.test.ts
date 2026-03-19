@@ -24,8 +24,8 @@ vi.mock("@/lib/inngest/report-generation", () => ({
   createReportGenerationQueue: createReportGenerationQueueMock,
 }));
 
-import { GET as getReportRoute } from "@/app/api/reports/[reportId]/route";
-import { POST as generateReportRoute } from "@/app/api/reports/[sessionId]/generate/route";
+import { GET as getReportRoute } from "@/app/api/reports/[id]/route";
+import { POST as generateReportRoute } from "@/app/api/reports/[id]/generate/route";
 import { GET as listReportsRoute } from "@/app/api/reports/route";
 
 describe("report api routes", () => {
@@ -125,7 +125,7 @@ describe("report api routes", () => {
     });
 
     const response = await getReportRoute(undefined as never, {
-      params: Promise.resolve({ reportId: "report-1" }),
+      params: Promise.resolve({ id: "report-1" }),
     });
 
     expect(response.status).toBe(200);
@@ -147,7 +147,7 @@ describe("report api routes", () => {
     });
 
     const response = await getReportRoute(undefined as never, {
-      params: Promise.resolve({ reportId: "missing" }),
+      params: Promise.resolve({ id: "missing" }),
     });
 
     expect(response.status).toBe(404);
@@ -172,7 +172,7 @@ describe("report api routes", () => {
     });
 
     const response = await generateReportRoute(undefined as never, {
-      params: Promise.resolve({ sessionId: "session-1" }),
+      params: Promise.resolve({ id: "session-1" }),
     });
 
     expect(response.status).toBe(202);
