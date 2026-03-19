@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Mic, MicOff, Pause, Play, Send, Square } from "lucide-react";
 import { getInterviewModePreset } from "@/lib/interview-session/catalog";
 import {
@@ -47,11 +48,13 @@ function Metric({
 
 export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) {
   const [state, dispatch] = useReducer(interviewSessionReducer, initialSession);
+  const [runtimeNotice, setRuntimeNotice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const connectionRef = useRef<{
     close(): void;
     sendText(text: string): void;
   } | null>(null);
+  const router = useRouter();
   const preset = getInterviewModePreset(state.mode);
   const progressPercent = getInterviewProgressPercent(
     state.elapsedSeconds,
@@ -165,6 +168,8 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
   ]);
 
   function handleSessionStart() {
+    setRuntimeNotice(null);
+
     if (state.status === "paused") {
       dispatch({ type: "session-resumed" });
       return;
@@ -181,26 +186,100 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     dispatch({ type: "session-paused" });
   }
 
-  function handleSessionEnd() {
+  async function handleSessionEnd() {
     connectionRef.current?.close();
     connectionRef.current = null;
     dispatch({ type: "session-ended" });
+
+    try {
+      const completeResponse = await fetch(
+        `/api/interview/sessions/${state.sessionId}/complete`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+
+      if (!completeResponse.ok) {
+        throw new Error("Failed to complete the interview session.");
+      }
+
+      const reportResponse = await fetch(
+        `/api/reports/${state.sessionId}/generate`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!reportResponse.ok) {
+        throw new Error("Session saved, but report generation could not be queued.");
+      }
+
+      setRuntimeNotice("Session saved. Report generation queued.");
+      router.push("/reports");
+    } catch (error) {
+      setRuntimeNotice(
+        error instanceof Error
+          ? error.message
+          : "Session ended locally, but the server could not persist the final state.",
+      );
+    }
   }
 
   function handleModeChange(value: string) {
     connectionRef.current?.close();
     connectionRef.current = null;
     dispatch({ type: "mode-changed", mode: value as InterviewSessionState["mode"] });
+    router.push(`/interview?mode=${value}`);
   }
 
-  function handleSubmit() {
-    const draft = state.draftResponse.trim();
+  async function handleSubmit() {
+    const trimmedDraft = state.draftResponse.trim();
 
-    if (draft) {
-      connectionRef.current?.sendText(draft);
+    if (!trimmedDraft || state.status !== "live") {
+      return;
     }
 
+    const nextState = interviewSessionReducer(state, {
+      type: "response-submitted",
+    });
+    const appendedTurns = nextState.transcript
+      .slice(state.transcript.length)
+      .filter((turn) => turn.speaker !== "system")
+      .map((turn) => ({
+        speaker: turn.speaker,
+        body: turn.text,
+        seconds: turn.elapsedSeconds,
+      }));
+
+    setRuntimeNotice(null);
+    connectionRef.current?.sendText(trimmedDraft);
     dispatch({ type: "response-submitted" });
+
+    try {
+      const response = await fetch(`/api/interview/sessions/${state.sessionId}/turns`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          turns: appendedTurns,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("The transcript updated locally, but the server could not persist the new turns.");
+      }
+    } catch (error) {
+      setRuntimeNotice(
+        error instanceof Error
+          ? error.message
+          : "The transcript updated locally, but the server could not persist the new turns.",
+      );
+    }
   }
 
   return (
@@ -437,7 +516,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
                 Session status
               </span>
               <span className="text-sm font-semibold text-slate-900">
-                {state.connectionMessage}
+                {runtimeNotice ?? state.connectionMessage}
               </span>
             </div>
           </CardContent>

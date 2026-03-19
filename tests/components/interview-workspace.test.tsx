@@ -1,12 +1,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InterviewWorkspace } from "@/components/interview/interview-workspace";
 import { createDemoInterviewSession } from "@/lib/interview-session/fixtures";
 
 const connectBrowserRealtimeSessionMock = vi.hoisted(() => vi.fn());
 const createBrowserRealtimeSnapshotMock = vi.hoisted(() => vi.fn());
 const pushMock = vi.hoisted(() => vi.fn());
+const fetchMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/openai/browser-realtime", () => ({
   connectBrowserRealtimeSession: connectBrowserRealtimeSessionMock,
@@ -20,6 +21,15 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("InterviewWorkspace", () => {
+  global.fetch = fetchMock as typeof fetch;
+
+  beforeEach(() => {
+    connectBrowserRealtimeSessionMock.mockReset();
+    createBrowserRealtimeSnapshotMock.mockReset();
+    pushMock.mockReset();
+    fetchMock.mockReset();
+  });
+
   it("switches the mode selector and resets the prompt preview", async () => {
     const user = userEvent.setup();
 
@@ -39,6 +49,12 @@ describe("InterviewWorkspace", () => {
     const user = userEvent.setup();
     const sendText = vi.fn();
     const close = vi.fn();
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn(),
+      text: vi.fn(),
+    });
 
     connectBrowserRealtimeSessionMock.mockResolvedValue({
       snapshot: {
@@ -81,6 +97,12 @@ describe("InterviewWorkspace", () => {
 
     expect(sendText).toHaveBeenCalledWith(
       "I split the read/write paths and introduced backpressure limits.",
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/interview/sessions/interview-demo-session/turns",
+      expect.objectContaining({
+        method: "POST",
+      }),
     );
     await waitFor(() =>
       expect(screen.getAllByText(/hardest bottlenecks and why/i)[0]).toBeInTheDocument(),
