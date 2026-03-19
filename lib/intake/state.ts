@@ -1,12 +1,16 @@
-import { buildOnboardingSummary, createDemoOnboardingDraft } from "@/lib/intake/summary";
-import type { OnboardingSubmissionState } from "@/lib/intake/types";
+import { buildOnboardingSummary, createEmptyOnboardingDraft } from "@/lib/intake/summary";
+import { makeOnboardingStateMessage } from "@/lib/intake/persistence";
+import type { OnboardingDraft, OnboardingSubmissionState } from "@/lib/intake/types";
 
-export function createInitialOnboardingState(): OnboardingSubmissionState {
+export function createInitialOnboardingState(
+  draft: OnboardingDraft = createEmptyOnboardingDraft(),
+): OnboardingSubmissionState {
+  const summary = buildOnboardingSummary(draft);
+
   return {
     status: "idle",
-    message:
-      "Review the defaults, then save a draft to generate a grounded interview plan.",
-    summary: buildOnboardingSummary(createDemoOnboardingDraft()),
+    message: makeOnboardingStateMessage(summary.completion),
+    summary,
     fieldErrors: {},
   };
 }
