@@ -18,8 +18,6 @@ import { getDb } from "@/lib/db/client";
 import { createEmptyOnboardingDraft } from "@/lib/intake/summary";
 import type { OnboardingDraft } from "@/lib/intake/types";
 import {
-  buildResumePreviewFromFile,
-  buildResumePreviewFromText,
   parseResumeFileName,
 } from "@/lib/resume/parser";
 import type { ResumeUploadPreview } from "@/lib/resume/types";
