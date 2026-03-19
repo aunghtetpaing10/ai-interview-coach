@@ -8,6 +8,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
+import type { AnswerRewrite, CitationBlock } from "@/lib/reporting/types";
+import type { Scorecard } from "@/lib/types/interview";
 
 export type InterviewMode =
   | "behavioral"
@@ -22,7 +24,7 @@ export type RubricKey =
   | "communication"
   | "systems-thinking";
 
-export type SessionStatus = "draft" | "active" | "completed" | "archived";
+export type SessionStatus = "draft" | "active" | "paused" | "completed" | "archived";
 export type TranscriptSpeaker = "interviewer" | "candidate";
 export type ScoreBand = "training" | "improving" | "ready";
 
@@ -57,6 +59,20 @@ export const resumeAssets = pgTable("resume_assets", {
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const jobTargets = pgTable("job_targets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  targetRoleId: uuid("target_role_id")
+    .notNull()
+    .references(() => targetRoles.id, { onDelete: "cascade" }),
+  companyName: text("company_name").notNull(),
+  jobTitle: text("job_title").notNull(),
+  jobUrl: text("job_url").notNull(),
+  jobDescription: text("job_description").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const rubricDimensions = pgTable("rubric_dimensions", {
   id: uuid("id").primaryKey().defaultRandom(),
   key: text("key").notNull().unique(),
@@ -78,40 +94,57 @@ export const questionBank = pgTable("question_bank", {
 export const interviewSessions = pgTable("interview_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull(),
-  targetRoleId: uuid("target_role_id").notNull(),
+  targetRoleId: uuid("target_role_id")
+    .notNull()
+    .references(() => targetRoles.id, { onDelete: "cascade" }),
   mode: text("mode").$type<InterviewMode>().notNull(),
   status: text("status").$type<SessionStatus>().notNull().default("draft"),
   title: text("title").notNull(),
   overallScore: integer("overall_score"),
+  durationSeconds: integer("duration_seconds").notNull().default(18 * 60),
   startedAt: timestamp("started_at", { withTimezone: true }),
   endedAt: timestamp("ended_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const transcriptTurns = pgTable("transcript_turns", {
   id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: uuid("session_id").notNull(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => interviewSessions.id, { onDelete: "cascade" }),
   speaker: text("speaker").$type<TranscriptSpeaker>().notNull(),
   body: text("body").notNull(),
   seconds: integer("seconds").notNull(),
+  sequenceIndex: integer("sequence_index").notNull().default(0),
   confidence: integer("confidence").notNull().default(100),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const feedbackReports = pgTable("feedback_reports", {
   id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: uuid("session_id").notNull(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => interviewSessions.id, { onDelete: "cascade" }),
+  promptVersionId: uuid("prompt_version_id").references(() => promptVersions.id, {
+    onDelete: "set null",
+  }),
   summary: text("summary").notNull(),
+  scorecard: jsonb("scorecard").$type<Scorecard>().notNull(),
   strengths: jsonb("strengths").$type<readonly string[]>(),
   gaps: jsonb("gaps").$type<readonly string[]>(),
-  citations: jsonb("citations").$type<
-    readonly { timestamp: string; quote: string; rationale: string }[]
-  >(),
+  citations: jsonb("citations").$type<readonly CitationBlock[]>(),
+  rewrites: jsonb("rewrites").$type<readonly AnswerRewrite[]>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const practicePlans = pgTable("practice_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: uuid("session_id").notNull(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => interviewSessions.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
+  focus: text("focus").notNull(),
   steps: jsonb("steps").$type<
     readonly { title: string; description: string; length: string }[]
   >(),
@@ -139,6 +172,7 @@ export const evalCases = pgTable("eval_cases", {
 export type ProfileRow = InferSelectModel<typeof profiles>;
 export type TargetRoleRow = InferSelectModel<typeof targetRoles>;
 export type ResumeAssetRow = InferSelectModel<typeof resumeAssets>;
+export type JobTargetRow = InferSelectModel<typeof jobTargets>;
 export type RubricDimensionRow = InferSelectModel<typeof rubricDimensions>;
 export type QuestionBankRow = InferSelectModel<typeof questionBank>;
 export type InterviewSessionRow = InferSelectModel<typeof interviewSessions>;
@@ -151,6 +185,7 @@ export type EvalCaseRow = InferSelectModel<typeof evalCases>;
 export type NewProfileRow = InferInsertModel<typeof profiles>;
 export type NewTargetRoleRow = InferInsertModel<typeof targetRoles>;
 export type NewResumeAssetRow = InferInsertModel<typeof resumeAssets>;
+export type NewJobTargetRow = InferInsertModel<typeof jobTargets>;
 export type NewRubricDimensionRow = InferInsertModel<typeof rubricDimensions>;
 export type NewQuestionBankRow = InferInsertModel<typeof questionBank>;
 export type NewInterviewSessionRow = InferInsertModel<typeof interviewSessions>;

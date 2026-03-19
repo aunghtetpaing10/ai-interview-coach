@@ -7,20 +7,14 @@ import { buildSignInPath, resolvePostAuthPath } from "@/lib/auth/paths";
 export interface WorkspaceUser {
   id: string;
   email: string | null;
-  source: "demo" | "supabase";
+  source: "supabase";
 }
-
-export const DEMO_WORKSPACE_USER: WorkspaceUser = {
-  id: "user_1",
-  email: "demo@interview-coach.local",
-  source: "demo",
-};
 
 export async function getWorkspaceUser(): Promise<WorkspaceUser | null> {
   const client = await createSupabaseServerClient();
 
   if (!client) {
-    return DEMO_WORKSPACE_USER;
+    return null;
   }
 
   const { data, error } = await client.auth.getUser();
