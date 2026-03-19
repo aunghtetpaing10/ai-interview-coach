@@ -1,8 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { InterviewWorkspace } from "@/components/interview/interview-workspace";
 import { createDemoInterviewSession } from "@/lib/interview-session/fixtures";
+
+const connectBrowserRealtimeSessionMock = vi.hoisted(() => vi.fn());
+const createBrowserRealtimeSnapshotMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/openai/browser-realtime", () => ({
+  connectBrowserRealtimeSession: connectBrowserRealtimeSessionMock,
+  createBrowserRealtimeSnapshot: createBrowserRealtimeSnapshotMock,
+}));
 
 describe("InterviewWorkspace", () => {
   it("switches the mode selector and resets the prompt preview", async () => {
@@ -10,15 +18,32 @@ describe("InterviewWorkspace", () => {
 
     render(<InterviewWorkspace initialSession={createDemoInterviewSession()} />);
 
-    expect(screen.getAllByText(/design a real-time notification service/i)[0]).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/design a real-time notification service/i)[0],
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /behavioral/i }));
 
     expect(screen.getAllByText(/inherited something messy/i)[0]).toBeInTheDocument();
   });
 
-  it("starts a live session and queues the next follow-up after a response", async () => {
+  it("connects the realtime transport and still supports text fallback submission", async () => {
     const user = userEvent.setup();
+    const sendText = vi.fn();
+    const close = vi.fn();
+
+    connectBrowserRealtimeSessionMock.mockResolvedValue({
+      snapshot: {
+        provider: "openai",
+        label: "gpt-realtime realtime",
+        transportHint: "Connected over WebRTC.",
+        fallbackReason: "OpenAI Realtime session established.",
+        instructionPreview: "Probe the candidate's claims.",
+      },
+      connectionMessage: "Realtime transport connected and ready for voice interaction.",
+      sendText,
+      close,
+    });
 
     render(<InterviewWorkspace initialSession={createDemoInterviewSession()} />);
 
@@ -29,14 +54,14 @@ describe("InterviewWorkspace", () => {
     await user.click(startButton);
     expect(startButton).toBeDisabled();
 
-    const connectionMessages = await screen.findAllByText(
-      /mock transport connected/i,
+    const statusRow = screen.getAllByText("Session status")[0]?.closest("div");
+    expect(statusRow).not.toBeNull();
+    await within(statusRow as HTMLElement).findByText(
+      /realtime transport connected and ready/i,
       {},
       { timeout: 3000 },
     );
-
-    expect(connectionMessages[0]).toBeInTheDocument();
-    expect(startButton).toBeDisabled();
+    expect(connectBrowserRealtimeSessionMock).toHaveBeenCalledTimes(1);
 
     const draftAreas = screen.getAllByPlaceholderText(/draft your answer to/i);
 
@@ -46,6 +71,11 @@ describe("InterviewWorkspace", () => {
     );
     await user.click(screen.getAllByRole("button", { name: /send response/i })[0]);
 
-    expect(screen.getAllByText(/hardest bottlenecks and why/i)[0]).toBeInTheDocument();
+    expect(sendText).toHaveBeenCalledWith(
+      "I split the read/write paths and introduced backpressure limits.",
+    );
+    await waitFor(() =>
+      expect(screen.getAllByText(/hardest bottlenecks and why/i)[0]).toBeInTheDocument(),
+    );
   });
 });
