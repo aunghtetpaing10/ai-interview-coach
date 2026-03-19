@@ -1,34 +1,35 @@
-﻿# AI Interview Coach
+# AI Interview Coach
 
-A production-style AI interview coach for software candidates. The app is being
-built to demonstrate a real vertical AI product: live mock interviews,
-grounded follow-up questions, evidence-linked scoring, progress analytics, and
-production-minded observability.
+AI Interview Coach is a production-style interview prep app for software
+candidates. It combines onboarding, live mock interview sessions, report
+generation, and progress tracking into a single polished product demo.
 
-## Product goals
+## Product Focus
 
 - Voice-first mock interviews with text fallback
 - Resume and job-description grounded follow-up questions
-- Rubric-based scorecards with transcript citations
+- Rubric-based scoring with transcript citations
 - Progress tracking across behavioral, resume, project, and system design
   practice
-- Portfolio-grade engineering workflow with TDD, CI, and feature branches
+- Demo-friendly UX that still shows real engineering discipline
 
 ## Stack
 
-- Next.js App Router, React 19, TypeScript, Tailwind v4
-- `shadcn/ui` component system
+- Next.js App Router, React 19, TypeScript, Tailwind CSS v4
+- `shadcn/ui` for the UI foundation
 - OpenAI Realtime + Responses API
-- Supabase Auth, Postgres, Storage, and `pgvector`
+- Supabase Auth, Postgres, and Storage
+- Drizzle for SQL tooling
 - Inngest for async workflows
 - Upstash Redis for quotas and rate limits
-- Sentry and PostHog for observability
+- PostHog and Sentry for analytics and observability
 
-## Local development
+## Getting Started
 
-1. Copy `.env.example` to `.env.local`.
-2. Install dependencies with `npm install`.
-3. Start the app with `npm run dev`.
+1. Copy `.env.example` to `.env`.
+2. Fill in the env vars you plan to use.
+3. Install dependencies with `npm ci`.
+4. Start the app with `npm run dev`.
 
 ## Scripts
 
@@ -37,21 +38,34 @@ production-minded observability.
 - `npm run test`
 - `npm run test:e2e`
 - `npm run format`
+- `npm run format:write`
 - `npm run db:generate`
 - `npm run db:push`
 
-## Engineering workflow
+## Development Notes
 
-- `main` is reserved for reviewed, green builds.
-- Feature work should happen on `codex/*` branches.
-- Each feature branch should use small, readable commits.
-- Prefer tests-first changes for domain logic, API contracts, and UI behavior.
+- `main` is protected and should stay green.
+- Use short-lived feature branches and small, readable commits.
+- Prefer tests-first changes for reducers, parsers, validation, and server
+  helpers.
+- Keep the `shadcn/ui` base and the current visual language unless you are
+  deliberately changing the product theme.
 
-## Delivery slices
+## Repo Layout
 
-- `codex/bootstrap-platform`
-- `codex/auth-data-foundation`
-- `codex/intake-profile-flow`
-- `codex/live-interview-session`
-- `codex/reporting-evals`
-- `codex/progress-observability`
+- `app/`: routes, layouts, and server actions
+- `components/`: UI primitives and feature components
+- `lib/`: domain logic, integrations, and utility code
+- `db/`: schema and seed data
+- `tests/`: unit, component, and e2e coverage
+
+## Verification
+
+The CI workflow runs on Node 20 and executes:
+
+- `npm ci`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npx playwright install --with-deps chromium`
+- `npm run test:e2e`
