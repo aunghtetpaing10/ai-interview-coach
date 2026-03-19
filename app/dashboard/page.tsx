@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { ArrowRight, Clock3, Mic, Radar, Sparkles, Target } from "lucide-react";
+import { requireWorkspaceUser } from "@/lib/auth/session";
+import { createPostgresInterviewRepository } from "@/lib/data/database-repository";
+import { buildDashboardReadModel } from "@/lib/dashboard/read-model";
+import { createPostgresProgressStore } from "@/lib/progress-service/database-store";
+import { createProgressService } from "@/lib/progress-service/progress-service";
+import { createPostgresReportStore } from "@/lib/report-service/database-store";
+import { createReportService } from "@/lib/report-service/report-service";
 import { SectionTitle } from "@/components/section-title";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -13,7 +20,6 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { dashboardSnapshot } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 const iconMap = {
@@ -23,7 +29,30 @@ const iconMap = {
   target: Target,
 } as const;
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const user = await requireWorkspaceUser("/dashboard");
+  const repository = createPostgresInterviewRepository();
+  const reportService = createReportService(createPostgresReportStore());
+  const progressService = createProgressService(createPostgresProgressStore());
+
+  const [workspace, sessions, reportOverviews, progressSnapshot] = await Promise.all([
+    repository.getWorkspaceSnapshot(user.id),
+    repository.listWorkspaceSessions(user.id),
+    reportService.listReportOverviews(user.id),
+    progressService.getProgressSnapshot(user.id),
+  ]);
+
+  const latestReport = reportOverviews[0]
+    ? await reportService.getReportById(user.id, reportOverviews[0].id)
+    : null;
+  const model = buildDashboardReadModel({
+    workspace,
+    reportOverviews,
+    latestReport,
+    progressSnapshot,
+    completedSessionCount: sessions.filter((session) => session.status === "completed").length,
+  });
+
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-10 lg:px-10">
       <section className="grid gap-6 rounded-[2rem] border border-white/70 bg-slate-950 p-8 text-white shadow-[0_30px_100px_-45px_rgba(15,23,42,0.8)] lg:grid-cols-[1.15fr_0.85fr]">
@@ -33,43 +62,52 @@ export default function DashboardPage() {
           </Badge>
           <div className="space-y-3">
             <h1 className="text-4xl font-semibold tracking-[-0.04em]">
-              Good evening, {dashboardSnapshot.profile.firstName}.
+              Good evening, {model.firstName}.
             </h1>
             <p className="max-w-2xl text-base leading-7 text-slate-300">
-              Your project walkthrough scores are climbing, but system design
-              answers still lose points on tradeoff clarity and capacity
-              assumptions.
+              {model.heroDescription}
             </p>
           </div>
           <div className="flex flex-wrap gap-4">
-            <Button className="rounded-full bg-white text-slate-950 hover:bg-slate-100">
-              Start a live mock interview
-              <ArrowRight className="size-4" />
-            </Button>
-            <Button
-              variant="outline"
-              className="rounded-full border-white/20 bg-white/5 text-white hover:bg-white/10"
+            <Link
+              href="/interview"
+              className={cn(
+                buttonVariants({
+                  className: "rounded-full bg-white text-slate-950 hover:bg-slate-100",
+                }),
+              )}
             >
-              Review last scorecard
-            </Button>
+              Start a live interview
+              <ArrowRight className="size-4" />
+            </Link>
+            <Link
+              href={model.latestReport ? `/reports/${model.latestReport.id}` : "/reports"}
+              className={cn(
+                buttonVariants({
+                  variant: "outline",
+                  className: "rounded-full border-white/20 bg-white/5 text-white hover:bg-white/10",
+                }),
+              )}
+            >
+              Review latest scorecard
+            </Link>
           </div>
         </div>
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader className="pb-4">
             <CardDescription className="text-slate-300">
-              Next scheduled drill
+              Next deliberate drill
             </CardDescription>
-            <CardTitle className="text-2xl">System design: chat service</CardTitle>
+            <CardTitle className="text-2xl">{model.nextDrillTitle}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 p-4">
               <Clock3 className="mt-0.5 size-4 text-amber-300" />
               <div className="space-y-1 text-sm text-slate-300">
-                <p className="font-medium text-white">14-minute live drill</p>
-                <p>
-                  Focus on sharding tradeoffs, backpressure, and API boundary
-                  decisions.
+                <p className="font-medium text-white">
+                  {model.latestReport ? "Grounded practice plan" : "Finish the first loop"}
                 </p>
+                <p>{model.nextDrillDescription}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -79,8 +117,9 @@ export default function DashboardPage() {
                 </AvatarFallback>
               </Avatar>
               <p className="text-sm leading-6 text-slate-300">
-                I will interrupt vague answers and ask for concrete ownership
-                evidence when needed.
+                {model.latestReport
+                  ? `Latest report: ${model.latestReport.summary}`
+                  : "The next completed interview will generate a persisted report and a reusable practice plan."}
               </p>
             </div>
           </CardContent>
@@ -88,7 +127,7 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-4">
-        {dashboardSnapshot.stats.map((stat) => {
+        {model.stats.map((stat) => {
           const Icon = iconMap[stat.icon];
 
           return (
@@ -118,27 +157,20 @@ export default function DashboardPage() {
             <SectionTitle
               eyebrow="Progress snapshot"
               title="Scores by interview track"
-              description="The current dashboard uses mock data, but the structure matches the scorecard model used throughout the app."
+              description="These scorecards are now derived from persisted report data instead of static fixtures."
             />
           </CardHeader>
           <CardContent>
-            <Tabs
-              defaultValue={dashboardSnapshot.scorecards[0].mode}
-              className="space-y-6"
-            >
+            <Tabs defaultValue={model.scorecards[0]?.mode ?? "behavioral"} className="space-y-6">
               <TabsList className="grid w-full grid-cols-4">
-                {dashboardSnapshot.scorecards.map((scorecard) => (
+                {model.scorecards.map((scorecard) => (
                   <TabsTrigger key={scorecard.mode} value={scorecard.mode}>
                     {scorecard.label}
                   </TabsTrigger>
                 ))}
               </TabsList>
-              {dashboardSnapshot.scorecards.map((scorecard) => (
-                <TabsContent
-                  key={scorecard.mode}
-                  value={scorecard.mode}
-                  className="space-y-5"
-                >
+              {model.scorecards.map((scorecard) => (
+                <TabsContent key={scorecard.mode} value={scorecard.mode} className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-2">
                     {scorecard.competencies.map((competency) => (
                       <div
@@ -182,33 +214,39 @@ export default function DashboardPage() {
             <SectionTitle
               eyebrow="Today"
               title="Deliberate practice plan"
-              description="Practice is broken into short, evidence-based drills instead of generic advice."
+              description="When a report exists, the next drills come straight from the stored practice plan."
             />
           </CardHeader>
           <CardContent className="space-y-4">
-            {dashboardSnapshot.practicePlan.map((item, index) => (
-              <div
-                key={item.title}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      Step {index + 1}
-                    </p>
-                    <p className="mt-1 font-semibold text-slate-900">
-                      {item.title}
-                    </p>
+            {model.practicePlan.length > 0 ? (
+              model.practicePlan.map((item, index) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+                        Step {index + 1}
+                      </p>
+                      <p className="mt-1 font-semibold text-slate-900">
+                        {item.title}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">{item.length}</Badge>
                   </div>
-                  <Badge variant="secondary">{item.length}</Badge>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    {item.description}
+                  </p>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  {item.description}
-                </p>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+                Complete your first interview to generate a real plan here.
               </div>
-            ))}
+            )}
             <Link
-              href="/"
+              href={model.practicePlan.length > 0 ? "/reports" : "/onboarding"}
               className={cn(
                 buttonVariants({
                   variant: "outline",
@@ -216,7 +254,7 @@ export default function DashboardPage() {
                 }),
               )}
             >
-              Back to overview
+              {model.practicePlan.length > 0 ? "Open reports" : "Finish onboarding"}
             </Link>
           </CardContent>
         </Card>
