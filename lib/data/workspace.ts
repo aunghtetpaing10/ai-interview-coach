@@ -21,12 +21,12 @@ export function getWorkspaceMetricCopy(snapshot: WorkspaceSnapshot) {
     {
       label: "Rubric coverage",
       value: `${snapshot.rubricCount} criteria`,
-      description: "Seeded rubric dimensions ready for scorecard generation.",
+      description: "Reference rubric dimensions loaded from persisted data sources.",
     },
     {
       label: "Question bank",
       value: `${snapshot.questionCount} prompts`,
-      description: "Deterministic interview prompts to bootstrap retrieval and eval coverage.",
+      description: "Prompt inventory available for grounded interviews and eval coverage.",
     },
   ] as const;
 }

@@ -22,14 +22,9 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { createDemoOnboardingDraft } from "@/lib/intake/summary";
-import type { OnboardingSubmissionState } from "@/lib/intake/types";
-import { createInitialOnboardingState } from "@/lib/intake/state";
+import type { OnboardingDraft, OnboardingSubmissionState } from "@/lib/intake/types";
 import { submitOnboardingDraft } from "@/app/onboarding/actions";
 import { SummaryPanel } from "@/components/intake/summary-panel";
-
-const demoDraft = createDemoOnboardingDraft();
-const initialOnboardingState = createInitialOnboardingState();
 
 function FieldError({ message }: { message?: string }) {
   if (!message) {
@@ -83,10 +78,16 @@ function SectionShell({
   );
 }
 
-export function OnboardingFlow() {
+export function OnboardingFlow({
+  initialDraft,
+  initialState,
+}: {
+  initialDraft: OnboardingDraft;
+  initialState: OnboardingSubmissionState;
+}) {
   const [state, formAction, pending] = useActionState(
     submitOnboardingDraft,
-    initialOnboardingState,
+    initialState,
   );
 
   const currentState: OnboardingSubmissionState = state;
@@ -103,9 +104,9 @@ export function OnboardingFlow() {
             Set the target role, resume shell, and job description once.
           </h2>
           <p className="max-w-2xl text-base leading-7 text-slate-600">
-            This flow does not need live credentials. It validates the inputs,
-            builds a structured draft, and prepares the coach to ask grounded
-            follow-ups from the first session.
+            This flow validates the inputs, persists them for the signed-in
+            user, and prepares the coach to ask grounded follow-ups from the
+            first session.
           </p>
         </section>
 
@@ -120,7 +121,7 @@ export function OnboardingFlow() {
               <span className="text-sm font-medium text-slate-700">Role title</span>
               <Input
                 name="roleTitle"
-                defaultValue={demoDraft.roleTitle}
+                defaultValue={initialDraft.roleTitle}
                 placeholder="Backend Software Engineer"
                 aria-invalid={fieldErrors.roleTitle ? true : undefined}
                 className={cn(
@@ -131,7 +132,7 @@ export function OnboardingFlow() {
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Seniority</span>
-              <Select name="seniority" defaultValue={demoDraft.seniority}>
+              <Select name="seniority" defaultValue={initialDraft.seniority}>
                 <SelectTrigger
                   aria-invalid={fieldErrors.seniority ? true : undefined}
                   className={cn(
@@ -152,7 +153,7 @@ export function OnboardingFlow() {
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Company type</span>
-              <Select name="companyType" defaultValue={demoDraft.companyType}>
+              <Select name="companyType" defaultValue={initialDraft.companyType}>
                 <SelectTrigger
                   aria-invalid={fieldErrors.companyType ? true : undefined}
                   className={cn(
@@ -175,7 +176,7 @@ export function OnboardingFlow() {
               <span className="text-sm font-medium text-slate-700">Focus areas</span>
               <Input
                 name="focusAreas"
-                defaultValue={demoDraft.focusAreas.join(", ")}
+                defaultValue={initialDraft.focusAreas.join(", ")}
                 placeholder="APIs, ownership, reliability"
                 aria-invalid={fieldErrors.focusAreas ? true : undefined}
                 className={cn(
@@ -214,7 +215,7 @@ export function OnboardingFlow() {
               </span>
               <Textarea
                 name="resumeNotes"
-                defaultValue={demoDraft.resumeNotes}
+                defaultValue={initialDraft.resumeNotes}
                 placeholder="Paste a compact resume summary or bullet points here."
                 className="min-h-32"
                 aria-invalid={fieldErrors.resumeNotes ? true : undefined}
@@ -240,7 +241,7 @@ export function OnboardingFlow() {
                 <span className="text-sm font-medium text-slate-700">Company name</span>
                 <Input
                   name="companyName"
-                  defaultValue={demoDraft.companyName}
+                  defaultValue={initialDraft.companyName}
                   placeholder="Northstar"
                   aria-invalid={fieldErrors.companyName ? true : undefined}
                   className={cn(
@@ -253,7 +254,7 @@ export function OnboardingFlow() {
                 <span className="text-sm font-medium text-slate-700">Job title</span>
                 <Input
                   name="jobTitle"
-                  defaultValue={demoDraft.jobTitle}
+                  defaultValue={initialDraft.jobTitle}
                   placeholder="Software Engineer"
                   aria-invalid={fieldErrors.jobTitle ? true : undefined}
                   className={cn(
@@ -267,7 +268,7 @@ export function OnboardingFlow() {
               <span className="text-sm font-medium text-slate-700">Job URL</span>
               <Input
                 name="jobUrl"
-                defaultValue={demoDraft.jobUrl}
+                defaultValue={initialDraft.jobUrl}
                 placeholder="https://example.com/jobs/backend-engineer"
                 aria-invalid={fieldErrors.jobUrl ? true : undefined}
                 className={cn(
@@ -280,7 +281,7 @@ export function OnboardingFlow() {
               <span className="text-sm font-medium text-slate-700">Job description</span>
               <Textarea
                 name="jobDescription"
-                defaultValue={demoDraft.jobDescription}
+                defaultValue={initialDraft.jobDescription}
                 placeholder="Paste the full job description here."
                 className={cn(
                   "min-h-40",
@@ -300,8 +301,8 @@ export function OnboardingFlow() {
                 Mock-safe action
               </p>
               <p className="text-base text-slate-700">
-                The submit action validates the draft and returns a structured
-                coaching plan without calling external services.
+                The submit action validates the draft, persists it for the
+                authenticated user, and refreshes the workspace data model.
               </p>
             </div>
             <Button
@@ -335,7 +336,7 @@ export function OnboardingFlow() {
           <CardContent className="space-y-3 text-sm leading-6 text-slate-600">
             <p>All validation is local and deterministic, so the UX is safe to demo.</p>
             <Separator />
-            <p>The summary panel updates from the server action state, which makes the workflow feel real without requiring persistence.</p>
+            <p>The summary panel still updates from the server action state, but the saved data now hydrates the authenticated workspace and interview routes.</p>
           </CardContent>
         </Card>
       </div>

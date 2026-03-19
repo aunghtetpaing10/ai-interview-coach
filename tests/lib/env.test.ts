@@ -18,4 +18,18 @@ describe("parseEnv", () => {
       }),
     ).toThrow(/Invalid environment configuration/);
   });
+
+  it("treats blank optional variables as unset", () => {
+    const env = parseEnv({
+      POSTGRES_URL: "   ",
+      NEXT_PUBLIC_SUPABASE_URL: "",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: " ",
+      OPENAI_API_KEY: "",
+    });
+
+    expect(env.POSTGRES_URL).toBeUndefined();
+    expect(env.NEXT_PUBLIC_SUPABASE_URL).toBeUndefined();
+    expect(env.NEXT_PUBLIC_SUPABASE_ANON_KEY).toBeUndefined();
+    expect(env.OPENAI_API_KEY).toBeUndefined();
+  });
 });

@@ -1,19 +1,16 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, FileText, LayoutPanelTop, Sparkles } from "lucide-react";
+import { requireWorkspaceUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/site-header";
 import { ReportHero } from "@/components/reports/report-hero";
 import { ReportScoreGrid } from "@/components/reports/report-score-grid";
 import { ReportTabs } from "@/components/reports/report-tabs";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  FEATURED_REPORT,
-  REPORT_EVAL_CASES,
-  REPORT_OVERVIEWS,
-  REPORT_PROMPT_FIXTURES,
-  getReportById,
-} from "@/lib/reporting/mock-report";
+import { REPORT_EVAL_CASES, REPORT_PROMPT_FIXTURES } from "@/lib/evals/fixtures";
+import { createPostgresReportStore } from "@/lib/report-service/database-store";
+import { createReportService } from "@/lib/report-service/report-service";
 import { cn } from "@/lib/utils";
 
 export default async function Page({
@@ -21,8 +18,13 @@ export default async function Page({
 }: {
   params: Promise<{ reportId: string }>;
 }) {
+  const user = await requireWorkspaceUser("/reports");
   const { reportId } = await params;
-  const report = getReportById(reportId);
+  const reportService = createReportService(createPostgresReportStore());
+  const [report, reportOverviews] = await Promise.all([
+    reportService.getReportById(user.id, reportId),
+    reportService.listReportOverviews(user.id),
+  ]);
 
   if (!report) {
     notFound();
@@ -105,7 +107,7 @@ export default async function Page({
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-medium text-slate-900">Catalog count</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {REPORT_OVERVIEWS.length} tracked reports, with {FEATURED_REPORT.id} as the featured session.
+                  {reportOverviews.length} tracked reports for this user.
                 </p>
               </div>
               <Link

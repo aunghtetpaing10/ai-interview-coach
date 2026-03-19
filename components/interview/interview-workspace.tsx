@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Mic, MicOff, Pause, Play, Send, Square } from "lucide-react";
 import { getInterviewModePreset } from "@/lib/interview-session/catalog";
 import {
@@ -10,6 +11,10 @@ import {
   interviewSessionReducer,
 } from "@/lib/interview-session/session";
 import type { InterviewSessionState } from "@/lib/interview-session/types";
+import {
+  connectBrowserRealtimeSession,
+  createBrowserRealtimeSnapshot,
+} from "@/lib/openai/browser-realtime";
 import { RealtimePanel } from "@/components/interview/realtime-panel";
 import { TranscriptFeed } from "@/components/interview/transcript-feed";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +48,13 @@ function Metric({
 
 export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) {
   const [state, dispatch] = useReducer(interviewSessionReducer, initialSession);
+  const [runtimeNotice, setRuntimeNotice] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const connectionRef = useRef<{
+    close(): void;
+    sendText(text: string): void;
+  } | null>(null);
+  const router = useRouter();
   const preset = getInterviewModePreset(state.mode);
   const progressPercent = getInterviewProgressPercent(
     state.elapsedSeconds,
@@ -58,6 +70,13 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     state.status === "paused";
   const startDisabled =
     state.status === "connecting" || state.status === "live";
+
+  useEffect(() => {
+    return () => {
+      connectionRef.current?.close();
+      connectionRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (state.status !== "live") {
@@ -76,14 +95,81 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
       return;
     }
 
-    const timeout = window.setTimeout(() => {
-      dispatch({ type: "connection-established" });
-    }, 700);
+    const controller = new AbortController();
+    let active = true;
 
-    return () => window.clearTimeout(timeout);
-  }, [state.status]);
+    const openRealtimeSession = async () => {
+      try {
+        const connection = await connectBrowserRealtimeSession(
+          {
+            candidateName: state.candidateName,
+            targetRole: state.targetRole,
+            mode: state.mode,
+            focus: preset.focus,
+            openingPrompt: state.activePrompt,
+          },
+          {
+            audioElement: audioRef.current,
+            microphoneEnabled: state.microphoneEnabled,
+            signal: controller.signal,
+          },
+        );
+
+        if (!active || controller.signal.aborted) {
+          connection.close();
+          return;
+        }
+
+        connectionRef.current?.close();
+        connectionRef.current = connection;
+        dispatch({
+          type: "connection-established",
+          realtime: connection.snapshot,
+          connectionMessage: connection.connectionMessage,
+        });
+      } catch (error) {
+        if (!active || controller.signal.aborted) {
+          return;
+        }
+
+        connectionRef.current?.close();
+        connectionRef.current = null;
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "OpenAI Realtime unavailable. Continuing with text fallback.";
+
+        dispatch({
+          type: "connection-established",
+          realtime: createBrowserRealtimeSnapshot({
+            provider: "mock",
+            message,
+            openingPrompt: state.activePrompt,
+          }),
+          connectionMessage: "OpenAI Realtime unavailable. Continuing with text fallback.",
+        });
+      }
+    };
+
+    void openRealtimeSession();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [
+    state.status,
+    state.candidateName,
+    state.targetRole,
+    state.mode,
+    state.activePrompt,
+    state.microphoneEnabled,
+    preset.focus,
+  ]);
 
   function handleSessionStart() {
+    setRuntimeNotice(null);
+
     if (state.status === "paused") {
       dispatch({ type: "session-resumed" });
       return;
@@ -100,16 +186,100 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     dispatch({ type: "session-paused" });
   }
 
-  function handleSessionEnd() {
+  async function handleSessionEnd() {
+    connectionRef.current?.close();
+    connectionRef.current = null;
     dispatch({ type: "session-ended" });
+
+    try {
+      const completeResponse = await fetch(
+        `/api/interview/sessions/${state.sessionId}/complete`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+
+      if (!completeResponse.ok) {
+        throw new Error("Failed to complete the interview session.");
+      }
+
+      const reportResponse = await fetch(
+        `/api/reports/${state.sessionId}/generate`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!reportResponse.ok) {
+        throw new Error("Session saved, but report generation could not be queued.");
+      }
+
+      setRuntimeNotice("Session saved. Report generation queued.");
+      router.push("/reports");
+    } catch (error) {
+      setRuntimeNotice(
+        error instanceof Error
+          ? error.message
+          : "Session ended locally, but the server could not persist the final state.",
+      );
+    }
   }
 
   function handleModeChange(value: string) {
+    connectionRef.current?.close();
+    connectionRef.current = null;
     dispatch({ type: "mode-changed", mode: value as InterviewSessionState["mode"] });
+    router.push(`/interview?mode=${value}`);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    const trimmedDraft = state.draftResponse.trim();
+
+    if (!trimmedDraft || state.status !== "live") {
+      return;
+    }
+
+    const nextState = interviewSessionReducer(state, {
+      type: "response-submitted",
+    });
+    const appendedTurns = nextState.transcript
+      .slice(state.transcript.length)
+      .filter((turn) => turn.speaker !== "system")
+      .map((turn) => ({
+        speaker: turn.speaker,
+        body: turn.text,
+        seconds: turn.elapsedSeconds,
+      }));
+
+    setRuntimeNotice(null);
+    connectionRef.current?.sendText(trimmedDraft);
     dispatch({ type: "response-submitted" });
+
+    try {
+      const response = await fetch(`/api/interview/sessions/${state.sessionId}/turns`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          turns: appendedTurns,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("The transcript updated locally, but the server could not persist the new turns.");
+      }
+    } catch (error) {
+      setRuntimeNotice(
+        error instanceof Error
+          ? error.message
+          : "The transcript updated locally, but the server could not persist the new turns.",
+      );
+    }
   }
 
   return (
@@ -129,8 +299,8 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
               {state.candidateName} practicing for {state.targetRole}
             </CardTitle>
             <p className="max-w-3xl text-base leading-7 text-slate-300">
-              Move between interview modes, connect the mock realtime bridge, and
-              send text responses that queue the next interviewer follow-up.
+              Connect the browser to OpenAI Realtime for voice, or keep moving
+              in text fallback when the transport cannot be established.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -152,6 +322,8 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
             transcript={state.transcript}
             currentPrompt={state.activePrompt}
           />
+
+          <audio ref={audioRef} autoPlay playsInline className="hidden" />
 
           <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4">
             <div className="flex items-center justify-between gap-3">
@@ -344,7 +516,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
                 Session status
               </span>
               <span className="text-sm font-semibold text-slate-900">
-                {state.connectionMessage}
+                {runtimeNotice ?? state.connectionMessage}
               </span>
             </div>
           </CardContent>
@@ -364,9 +536,9 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
               UI integration points
             </CardTitle>
             <p className="text-sm leading-6 text-slate-600">
-              This shell is ready for a real transport layer later. For now, the
-              state machine, transcript timeline, and connection lifecycle are
-              all deterministic.
+              This shell now negotiates a real OpenAI Realtime transport in the
+              browser and keeps the text fallback path available when voice
+              setup is unavailable.
             </p>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-slate-700">

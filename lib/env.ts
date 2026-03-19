@@ -21,8 +21,21 @@ const envSchema = z.object({
 
 export type AppEnv = z.infer<typeof envSchema>;
 
+function normalizeEnv(input: Record<string, string | undefined>) {
+  return Object.fromEntries(
+    Object.entries(input).map(([key, value]) => {
+      if (typeof value !== "string") {
+        return [key, value];
+      }
+
+      const trimmed = value.trim();
+      return [key, trimmed === "" ? undefined : trimmed];
+    }),
+  );
+}
+
 export function parseEnv(input: Record<string, string | undefined>): AppEnv {
-  const parsed = envSchema.safeParse(input);
+  const parsed = envSchema.safeParse(normalizeEnv(input));
 
   if (!parsed.success) {
     const details = parsed.error.issues
