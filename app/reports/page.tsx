@@ -6,20 +6,25 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { requireWorkspaceUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionTitle } from "@/components/section-title";
-import {
-  FEATURED_REPORT,
-  REPORT_EVAL_CASES,
-  REPORT_OVERVIEWS,
-  REPORT_PROMPT_FIXTURES,
-} from "@/lib/reporting/mock-report";
+import { REPORT_EVAL_CASES, REPORT_PROMPT_FIXTURES } from "@/lib/evals/fixtures";
+import { createPostgresReportStore } from "@/lib/report-service/database-store";
+import { createReportService } from "@/lib/report-service/report-service";
 import { cn } from "@/lib/utils";
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  const user = await requireWorkspaceUser("/reports");
+  const reportService = createReportService(createPostgresReportStore());
+  const reportOverviews = await reportService.listReportOverviews(user.id);
+  const featuredReport = reportOverviews[0]
+    ? await reportService.getReportById(user.id, reportOverviews[0].id)
+    : null;
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(39,94,254,0.14),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(244,151,70,0.14),_transparent_30%),linear-gradient(180deg,_#f8f7f2_0%,_#f2eee5_48%,_#f8f4ec_100%)]" />
@@ -36,12 +41,13 @@ export default function ReportsPage() {
                 Reports that read like a product, not a chat transcript.
               </h1>
               <p className="max-w-2xl text-lg leading-8 text-slate-700">
-                Every report ties scorecards to exact transcript evidence, then turns the weakest signal into a short practice plan and a regression fixture.
+                Completed sessions now produce stored scorecards, transcript citations,
+                answer rewrites, and a reusable practice plan for the authenticated user.
               </p>
             </div>
             <div className="flex flex-col gap-4 sm:flex-row">
               <Link
-                href={`/reports/${FEATURED_REPORT.id}`}
+                href={featuredReport ? `/reports/${featuredReport.id}` : "/interview"}
                 className={cn(
                   buttonVariants({
                     size: "lg",
@@ -50,7 +56,7 @@ export default function ReportsPage() {
                   }),
                 )}
               >
-                Open latest report
+                {featuredReport ? "Open latest report" : "Complete an interview"}
                 <ArrowRight className="size-4" />
               </Link>
               <Link
@@ -76,10 +82,11 @@ export default function ReportsPage() {
                 Latest report
               </Badge>
               <CardTitle className="text-2xl font-semibold tracking-[-0.03em]">
-                {FEATURED_REPORT.title}
+                {featuredReport?.title ?? "No completed reports yet"}
               </CardTitle>
               <CardDescription className="max-w-md text-slate-300">
-                {FEATURED_REPORT.summary.headline}
+                {featuredReport?.summary.headline ??
+                  "Finish a live interview and queue report generation to populate this space."}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 p-6 sm:grid-cols-2">
@@ -88,10 +95,12 @@ export default function ReportsPage() {
                   Score
                 </p>
                 <p className="mt-2 text-4xl font-semibold tracking-[-0.05em]">
-                  {FEATURED_REPORT.scorecard.overallScore}
+                  {featuredReport?.scorecard.overallScore ?? "--"}
                 </p>
                 <p className="mt-2 text-sm text-slate-300">
-                  {FEATURED_REPORT.summary.band} with evidence-linked commentary
+                  {featuredReport
+                    ? `${featuredReport.summary.band} with evidence-linked commentary`
+                    : "Stored scorecards appear here after the first completed report."}
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -111,7 +120,7 @@ export default function ReportsPage() {
             {
               icon: FileText,
               title: "Evidence first",
-              body: "Each scorecard is traceable to a quoted transcript turn.",
+              body: "Each scorecard is traceable to persisted transcript turns and stored report rows.",
             },
             {
               icon: GalleryHorizontalEnd,
@@ -142,60 +151,80 @@ export default function ReportsPage() {
           <SectionTitle
             eyebrow="Report catalog"
             title="Recent sessions"
-            description="The catalog surfaces the latest full reports, each backed by the same helper pipeline and stable prompt fixtures."
+            description="The catalog now loads persisted reports for the signed-in user instead of placeholder fixtures."
           />
-          <div className="grid gap-4">
-            {REPORT_OVERVIEWS.map((report, index) => (
-              <Card key={report.id} className="border-slate-200/60 bg-white/85">
-                <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-2">
-                    <CardDescription className="uppercase tracking-[0.22em] text-slate-500">
-                      Report {index + 1}
-                    </CardDescription>
-                    <CardTitle className="text-2xl tracking-[-0.03em] text-slate-950">
-                      {report.title}
-                    </CardTitle>
-                    <p className="text-sm text-slate-600">
-                      {report.candidate} | {report.targetRole} | {report.sessionDate}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary" className="rounded-full">
-                      {report.scorecard.overallScore}
-                    </Badge>
-                    <Badge variant="outline" className="rounded-full">
-                      {report.summary.band}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
-                  <div className="space-y-3">
-                    <p className="text-sm leading-7 text-slate-600">
-                      {report.summary.headline}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {report.strengths.slice(0, 2).map((item) => (
-                        <Badge key={item} variant="outline" className="rounded-full">
-                          {item}
-                        </Badge>
-                      ))}
+          {reportOverviews.length > 0 ? (
+            <div className="grid gap-4">
+              {reportOverviews.map((report, index) => (
+                <Card key={report.id} className="border-slate-200/60 bg-white/85">
+                  <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-2">
+                      <CardDescription className="uppercase tracking-[0.22em] text-slate-500">
+                        Report {index + 1}
+                      </CardDescription>
+                      <CardTitle className="text-2xl tracking-[-0.03em] text-slate-950">
+                        {report.title}
+                      </CardTitle>
+                      <p className="text-sm text-slate-600">
+                        {report.candidate} | {report.targetRole} | {report.sessionDate}
+                      </p>
                     </div>
-                  </div>
-                  <Link
-                    href={`/reports/${report.id}`}
-                    className={cn(
-                      buttonVariants({
-                        variant: "outline",
-                        className: "rounded-full",
-                      }),
-                    )}
-                  >
-                    Open report
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary" className="rounded-full">
+                        {report.scorecard.overallScore}
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full">
+                        {report.summary.band}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
+                    <div className="space-y-3">
+                      <p className="text-sm leading-7 text-slate-600">
+                        {report.summary.headline}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {report.strengths.slice(0, 2).map((item) => (
+                          <Badge key={item} variant="outline" className="rounded-full">
+                            {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <Link
+                      href={`/reports/${report.id}`}
+                      className={cn(
+                        buttonVariants({
+                          variant: "outline",
+                          className: "rounded-full",
+                        }),
+                      )}
+                    >
+                      Open report
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="border-slate-200/60 bg-white/85">
+              <CardContent className="space-y-4 p-6 text-sm leading-7 text-slate-600">
+                <p>
+                  No reports are stored for this user yet. Complete an interview and queue report generation to populate the catalog.
+                </p>
+                <Link
+                  href="/interview"
+                  className={cn(
+                    buttonVariants({
+                      className: "rounded-full bg-slate-950 text-white hover:bg-slate-800",
+                    }),
+                  )}
+                >
+                  Start interview
+                </Link>
+              </CardContent>
+            </Card>
+          )}
         </section>
       </main>
     </div>
