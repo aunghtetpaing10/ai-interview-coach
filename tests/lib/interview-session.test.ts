@@ -94,4 +94,23 @@ describe("interview session state", () => {
     expect(snapshot.provider).toBe("mock");
     expect(snapshot.transportHint).toMatch(/No OpenAI API key/i);
   });
+
+  it("accepts a connected realtime snapshot and updates the live transport label", () => {
+    const initial = createDemoInterviewSession();
+    const connected = interviewSessionReducer(initial, {
+      type: "connection-established",
+      realtime: {
+        provider: "openai",
+        label: "gpt-realtime realtime",
+        transportHint: "Connected over WebRTC.",
+        fallbackReason: "OpenAI Realtime session established.",
+        instructionPreview: "Probe the candidate's claims.",
+      },
+      connectionMessage: "Realtime transport connected and ready for voice interaction.",
+    });
+
+    expect(connected.status).toBe("live");
+    expect(connected.realtime.provider).toBe("openai");
+    expect(connected.connectionMessage).toContain("ready for voice interaction");
+  });
 });

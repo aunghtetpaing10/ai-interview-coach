@@ -21,9 +21,8 @@ export function RealtimePanel({
           Session transport snapshot
         </CardTitle>
         <p className="text-sm leading-6 text-slate-600">
-          The UI is wired to a safe adapter shape. When no OpenAI key is
-          available, the session falls back to deterministic browser behavior so
-          the app stays demoable.
+          The browser negotiates an OpenAI Realtime session when available and
+          falls back to text-only coaching when voice transport is unavailable.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

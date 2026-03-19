@@ -171,22 +171,31 @@ export function interviewSessionReducer(
         status: "connecting",
         connectionMessage: "Negotiating the realtime interview transport...",
       };
-    case "connection-established":
+    case "connection-established": {
+      const connectedRealtime = action.realtime ?? state.realtime;
+      const connectedMessage =
+        action.connectionMessage ??
+        (connectedRealtime.provider === "mock"
+          ? "Mock transport connected. The session is now running in browser fallback mode."
+          : "Realtime transport connected and ready for voice interaction.");
+
       return {
-        ...appendTranscriptTurn(state, {
-          speaker: "system",
-          text:
-            state.realtime.provider === "mock"
-              ? "Local fallback transport connected. Voice playback is simulated in the browser."
-              : "Realtime transport connected.",
-          elapsedSeconds: state.elapsedSeconds,
-        }),
+        ...appendTranscriptTurn(
+          {
+            ...state,
+            realtime: connectedRealtime,
+          },
+          {
+            speaker: "system",
+            text: connectedMessage,
+            elapsedSeconds: state.elapsedSeconds,
+          },
+        ),
+        realtime: connectedRealtime,
         status: "live",
-        connectionMessage:
-          state.realtime.provider === "mock"
-            ? "Mock transport connected. The session is now running in browser fallback mode."
-            : "Realtime transport connected and ready for voice interaction.",
+        connectionMessage: connectedMessage,
       };
+    }
     case "connection-failed":
       return {
         ...state,
