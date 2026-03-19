@@ -12,6 +12,8 @@ generation, and progress tracking into a single polished product demo.
 - Progress tracking across behavioral, resume, project, and system design
   practice
 - Demo-friendly UX that still shows real engineering discipline
+- Supabase auth with email/password sign-in, Google OAuth entry points, and
+  sign-out in the workspace header
 
 ## Stack
 
@@ -27,9 +29,24 @@ generation, and progress tracking into a single polished product demo.
 ## Getting Started
 
 1. Copy `.env.example` to `.env`.
-2. Fill in the env vars you plan to use.
+2. Fill in the env vars you plan to use. `POSTGRES_URL` must be set if you want
+   the protected routes to load real user data locally.
 3. Install dependencies with `npm ci`.
 4. Start the app with `npm run dev`.
+
+## Auth Setup
+
+- Supabase email/password auth is wired through the `sign-in` and `sign-up`
+  screens.
+- Google login is supported through Supabase OAuth, but it must be enabled in
+  the Supabase dashboard and configured with a matching Google OAuth client.
+- Add `NEXT_PUBLIC_APP_URL` to the Google authorized origins list.
+- Add `${NEXT_PUBLIC_APP_URL}/auth/callback` to the Google authorized redirect
+  URIs list and the Supabase redirect allow list.
+- The auth screens preserve the `next` destination so protected routes can send
+  users back to the page they requested.
+- A successful auth flow still needs `POSTGRES_URL` configured locally, because
+  protected pages load real user-owned data after sign-in.
 
 ## Scripts
 

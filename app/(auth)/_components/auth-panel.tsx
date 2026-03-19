@@ -1,10 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { signInAction, signUpAction } from "@/app/(auth)/actions";
-import type { AuthFieldErrors } from "@/lib/auth/forms";
+import type { AuthActionState, AuthFieldErrors } from "@/lib/auth/forms";
+import {
+  buildAuthCallbackPath,
+  buildSignInPath,
+  buildSignUpPath,
+} from "@/lib/auth/paths";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,7 +20,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 
 function FieldError({
   errors,
@@ -32,7 +37,92 @@ function FieldError({
   return <p className="mt-1 text-sm text-red-600">{message}</p>;
 }
 
-export function SignInPanel() {
+function StatusMessage({
+  state,
+  initialMessage,
+}: {
+  state?: AuthActionState;
+  initialMessage?: string | null;
+}) {
+  if (state?.message) {
+    const tone =
+      state.status === "needs_confirmation"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+        : "border-rose-200 bg-rose-50 text-rose-700";
+
+    return <p className={`rounded-2xl border px-4 py-3 text-sm ${tone}`}>{state.message}</p>;
+  }
+
+  if (!initialMessage) {
+    return null;
+  }
+
+  return (
+    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      {initialMessage}
+    </p>
+  );
+}
+
+function GoogleAuthButton({
+  nextPath,
+  label,
+}: {
+  nextPath: string;
+  label: string;
+}) {
+  const [pending, setPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function handleGoogleAuth() {
+    setPending(true);
+    setErrorMessage(null);
+
+    const supabase = createSupabaseBrowserClient();
+
+    if (!supabase) {
+      setErrorMessage("Supabase credentials are not configured yet.");
+      setPending(false);
+      return;
+    }
+
+    const redirectTo = new URL(buildAuthCallbackPath(nextPath), window.location.origin).toString();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+      },
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full rounded-full border-slate-300 bg-white hover:bg-slate-50"
+        disabled={pending}
+        onClick={handleGoogleAuth}
+      >
+        {pending ? "Connecting to Google..." : label}
+      </Button>
+      {errorMessage ? <p className="text-sm text-rose-700">{errorMessage}</p> : null}
+    </div>
+  );
+}
+
+export function SignInPanel({
+  nextPath,
+  initialMessage,
+}: {
+  nextPath: string;
+  initialMessage?: string | null;
+}) {
   const [state, action, pending] = useActionState(signInAction, undefined);
 
   return (
@@ -46,7 +136,14 @@ export function SignInPanel() {
           Resume your interview prep, review your scorecards, and continue from the last session.
         </p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-5">
+        <StatusMessage state={state} initialMessage={initialMessage} />
+        <GoogleAuthButton label="Continue with Google" nextPath={nextPath} />
+        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" />
+          <span>Email and password</span>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
         <form action={action} className="space-y-5">
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium text-slate-700">
@@ -62,9 +159,9 @@ export function SignInPanel() {
             <Input id="password" name="password" type="password" placeholder="password123" />
             <FieldError errors={state?.fieldErrors} name="password" />
           </div>
-          <input type="hidden" name="next" value="/workspace" />
-          {state?.message ? <p className="text-sm text-slate-700">{state.message}</p> : null}
+          <input type="hidden" name="next" value={nextPath} />
           <Button
+            type="submit"
             className="w-full rounded-full bg-slate-950 text-white hover:bg-slate-800"
             disabled={pending}
           >
@@ -72,9 +169,9 @@ export function SignInPanel() {
             <ArrowRight className="size-4" />
           </Button>
         </form>
-        <p className="mt-6 text-sm text-slate-600">
+        <p className="text-sm text-slate-600">
           New here?{" "}
-          <Link className="font-medium text-[#1638d4]" href="/sign-up">
+          <Link className="font-medium text-[#1638d4]" href={buildSignUpPath(nextPath)}>
             Create an account
           </Link>
         </p>
@@ -83,7 +180,11 @@ export function SignInPanel() {
   );
 }
 
-export function SignUpPanel() {
+export function SignUpPanel({
+  nextPath,
+}: {
+  nextPath: string;
+}) {
   const [state, action, pending] = useActionState(signUpAction, undefined);
 
   return (
@@ -94,10 +195,17 @@ export function SignUpPanel() {
         </CardDescription>
         <CardTitle className="text-3xl tracking-[-0.04em]">Create account</CardTitle>
         <p className="max-w-lg text-sm leading-6 text-slate-600">
-          Set your target role once, then keep your resume, sessions, and scorecards tied to one workspace.
+          Create the account first, then finish role and resume setup in onboarding.
         </p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-5">
+        <StatusMessage state={state} />
+        <GoogleAuthButton label="Continue with Google" nextPath={nextPath} />
+        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" />
+          <span>Email and password</span>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
         <form action={action} className="space-y-5">
           <div className="space-y-2">
             <label htmlFor="fullName" className="text-sm font-medium text-slate-700">
@@ -120,20 +228,9 @@ export function SignUpPanel() {
             <Input id="password" name="password" type="password" placeholder="password123" />
             <FieldError errors={state?.fieldErrors} name="password" />
           </div>
-          <div className="space-y-2">
-            <label htmlFor="targetRole" className="text-sm font-medium text-slate-700">
-              Target role
-            </label>
-            <Textarea
-              id="targetRole"
-              name="targetRole"
-              placeholder="Mid-level software engineer at a product company"
-            />
-            <FieldError errors={state?.fieldErrors} name="targetRole" />
-          </div>
-          <input type="hidden" name="next" value="/workspace" />
-          {state?.message ? <p className="text-sm text-slate-700">{state.message}</p> : null}
+          <input type="hidden" name="next" value={nextPath} />
           <Button
+            type="submit"
             className="w-full rounded-full bg-slate-950 text-white hover:bg-slate-800"
             disabled={pending}
           >
@@ -141,9 +238,9 @@ export function SignUpPanel() {
             <ArrowRight className="size-4" />
           </Button>
         </form>
-        <p className="mt-6 text-sm text-slate-600">
+        <p className="text-sm text-slate-600">
           Already have an account?{" "}
-          <Link className="font-medium text-[#1638d4]" href="/sign-in">
+          <Link className="font-medium text-[#1638d4]" href={buildSignInPath(nextPath)}>
             Sign in
           </Link>
         </p>

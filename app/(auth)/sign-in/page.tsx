@@ -1,6 +1,16 @@
 import { SignInPanel } from "@/app/(auth)/_components/auth-panel";
+import { getAuthErrorMessage } from "@/lib/auth/messages";
+import { resolvePostAuthPath } from "@/lib/auth/paths";
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ next?: string; error?: string }>;
+}) {
+  const params = await searchParams;
+  const nextPath = resolvePostAuthPath(params?.next);
+  const initialMessage = getAuthErrorMessage(params?.error);
+
   return (
     <section className="grid w-full gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
       <div className="space-y-6">
@@ -11,10 +21,10 @@ export default function SignInPage() {
           Sign in to a workspace that keeps your interview prep tied to real evidence.
         </h1>
         <p className="max-w-lg text-lg leading-8 text-slate-700">
-          The auth layer is wired for Supabase sessions, protected routes, and future data access without locking the app into a mock-only model.
+          Use email or Google to get back into your workspace. Onboarding owns the role and resume setup after auth.
         </p>
       </div>
-      <SignInPanel />
+      <SignInPanel nextPath={nextPath} initialMessage={initialMessage} />
     </section>
   );
 }
