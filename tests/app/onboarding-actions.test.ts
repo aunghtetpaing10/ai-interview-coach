@@ -6,6 +6,8 @@ const { requireWorkspaceUserMock, saveOnboardingDraftForUserMock } = vi.hoisted(
   saveOnboardingDraftForUserMock: vi.fn(),
 }));
 
+const revalidatePathMock = vi.hoisted(() => vi.fn());
+
 vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -13,7 +15,7 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 vi.mock("next/cache", () => ({
-  revalidatePath: vi.fn(),
+  revalidatePath: revalidatePathMock,
 }));
 
 vi.mock("@/lib/intake/persistence", async () => {
@@ -54,6 +56,7 @@ describe("submitOnboardingDraft", () => {
   beforeEach(() => {
     requireWorkspaceUserMock.mockReset();
     saveOnboardingDraftForUserMock.mockReset();
+    revalidatePathMock.mockReset();
     requireWorkspaceUserMock.mockResolvedValue({
       id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       email: "candidate@example.com",
@@ -79,6 +82,8 @@ describe("submitOnboardingDraft", () => {
         userId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       }),
     );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/onboarding");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
   });
 
   it("preserves the previous summary and exposes field errors for invalid input", async () => {

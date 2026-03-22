@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Radar } from "lucide-react";
 import { requireWorkspaceUser } from "@/lib/auth/session";
 import { ProgressDashboard } from "@/components/progress/progress-dashboard";
+import { CandidateShell } from "@/components/workspace/candidate-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,10 +30,16 @@ export default async function ProgressPage() {
   const posthog = getPostHogTelemetryStatus();
   const sentry = getSentryTelemetryStatus();
   const rateLimit = getRateLimitTelemetryStatus();
+  const userLabel = user.email ?? "Candidate";
 
   if (!snapshot) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-10 lg:px-10">
+      <CandidateShell
+        activeHref="/progress"
+        userLabel={userLabel}
+        headline="Track score movement, telemetry health, and how often deliberate practice is actually happening."
+        railNote="Progress keeps its existing analytics behavior; this pass only moves it into the signed-in Curator shell."
+      >
         <Card className="border-slate-200/70 bg-white/90 shadow-[0_24px_90px_-50px_rgba(15,23,42,0.45)]">
           <CardHeader className="space-y-4">
             <Badge className="w-fit rounded-full bg-[#1638d4] px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-white">
@@ -77,19 +84,26 @@ export default async function ProgressPage() {
             </div>
           </CardContent>
         </Card>
-      </main>
+      </CandidateShell>
     );
   }
 
   return (
-    <ProgressDashboard
-      snapshot={snapshot}
-      posthog={posthog}
-      sentry={sentry}
-      rateLimit={rateLimit}
-      quotaUsed={Math.min(sessions.length, rateLimit.limit)}
-      quotaLimit={rateLimit.limit}
-      quotaResetAt={rateLimit.enabled ? "rolling window" : "when configured"}
-    />
+    <CandidateShell
+      activeHref="/progress"
+      userLabel={userLabel}
+      headline="Track score movement, telemetry health, and how often deliberate practice is actually happening."
+      railNote="Progress keeps its existing analytics behavior; this pass only moves it into the signed-in Curator shell."
+    >
+      <ProgressDashboard
+        snapshot={snapshot}
+        posthog={posthog}
+        sentry={sentry}
+        rateLimit={rateLimit}
+        quotaUsed={Math.min(sessions.length, rateLimit.limit)}
+        quotaLimit={rateLimit.limit}
+        quotaResetAt={rateLimit.enabled ? "rolling window" : "when configured"}
+      />
+    </CandidateShell>
   );
 }

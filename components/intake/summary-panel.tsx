@@ -13,17 +13,17 @@ type SummaryPanelProps = {
 };
 
 const trackTone: Record<string, string> = {
-  behavioral: "bg-[#1638d4]/10 text-[#1638d4]",
-  resume: "bg-emerald-500/10 text-emerald-700",
-  project: "bg-amber-500/10 text-amber-800",
-  "system-design": "bg-slate-950/10 text-slate-950",
+  behavioral: "bg-[rgba(20,63,134,0.12)] text-[color:var(--curator-navy)]",
+  resume: "bg-[rgba(25,135,84,0.12)] text-emerald-800",
+  project: "bg-[rgba(208,127,79,0.14)] text-[color:var(--curator-navy)]",
+  "system-design": "bg-[rgba(31,42,68,0.08)] text-[color:var(--curator-ink)]",
 };
 
 export function SummaryPanel({ state, pending }: SummaryPanelProps) {
   const { summary } = state;
 
   return (
-    <Card className="sticky top-6 overflow-hidden border-slate-200/70 bg-slate-950 text-white shadow-[0_30px_100px_-45px_rgba(15,23,42,0.85)]">
+    <Card className="sticky top-6 overflow-hidden curator-card-dark">
       <CardHeader className="gap-4 border-b border-white/10 bg-[linear-gradient(180deg,_rgba(255,255,255,0.08),_rgba(255,255,255,0))]">
         <div className="flex items-center justify-between gap-3">
           <Badge className="rounded-full bg-white/10 text-white">
@@ -72,7 +72,7 @@ export function SummaryPanel({ state, pending }: SummaryPanelProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
             Resume shell
           </p>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="font-medium">{summary.resumePreview.fileName}</p>
               <Badge variant="secondary" className="rounded-full bg-white/10 text-white">

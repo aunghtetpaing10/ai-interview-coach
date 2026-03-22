@@ -1,32 +1,46 @@
-const DEFAULT_WORKSPACE_PATH = "/workspace";
+const DEFAULT_WORKSPACE_PATH = "/dashboard";
 const DISALLOWED_AUTH_PATHS = new Set(["/sign-in", "/sign-up", "/auth/callback"]);
+
+function normalizeWorkspaceAlias(path: string) {
+  if (path === "/workspace") {
+    return "/dashboard";
+  }
+
+  if (path.startsWith("/workspace?") || path.startsWith("/workspace#")) {
+    return `/dashboard${path.slice("/workspace".length)}`;
+  }
+
+  return path;
+}
 
 export function resolvePostAuthPath(
   candidate: string | null | undefined,
   fallback = DEFAULT_WORKSPACE_PATH,
 ) {
+  const safeFallback = normalizeWorkspaceAlias(fallback);
+
   if (!candidate) {
-    return fallback;
+    return safeFallback;
   }
 
   try {
     const url = new URL(candidate, "http://local.test");
 
     if (url.origin !== "http://local.test") {
-      return fallback;
+      return safeFallback;
     }
 
     if (!url.pathname.startsWith("/")) {
-      return fallback;
+      return safeFallback;
     }
 
     if (DISALLOWED_AUTH_PATHS.has(url.pathname)) {
-      return fallback;
+      return safeFallback;
     }
 
-    return `${url.pathname}${url.search}${url.hash}`;
+    return normalizeWorkspaceAlias(`${url.pathname}${url.search}${url.hash}`);
   } catch {
-    return fallback;
+    return safeFallback;
   }
 }
 

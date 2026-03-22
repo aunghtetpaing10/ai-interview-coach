@@ -12,18 +12,18 @@ type ReportHeroProps = {
 
 export function ReportHero({ report }: ReportHeroProps) {
   return (
-    <Card className="overflow-hidden border-slate-200/70 bg-slate-950 text-white shadow-[0_30px_100px_-35px_rgba(15,23,42,0.82)]">
-      <CardHeader className="gap-5 border-b border-white/10 bg-[linear-gradient(180deg,_rgba(255,255,255,0.08),_rgba(255,255,255,0))]">
+    <Card className="curator-card-dark overflow-hidden">
+      <CardHeader className="gap-5 border-b border-white/10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Badge className="rounded-full bg-white/10 text-white">
             <Sparkles className="mr-1 size-3" />
-            Reporting slice
+            Latest report detail
           </Badge>
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-slate-300">
             Prompt {report.promptVersion}
           </span>
         </div>
-        <CardTitle className="max-w-4xl text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
+        <CardTitle className="curator-display max-w-4xl text-5xl text-white sm:text-6xl">
           {report.title}
         </CardTitle>
         <CardDescription className="max-w-3xl text-base leading-7 text-slate-300">
@@ -31,25 +31,28 @@ export function ReportHero({ report }: ReportHeroProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div className="space-y-3">
-          <p className="text-sm uppercase tracking-[0.25em] text-slate-400">
-            {report.candidate} | {report.targetRole}
-          </p>
-          <p className="text-sm leading-7 text-slate-300">
-            Session date {report.sessionDate} | scorecards are anchored to transcript evidence and rewritten into a practice plan.
-          </p>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-400">
+              {report.candidate} | {report.targetRole}
+            </p>
+            <p className="text-sm leading-7 text-slate-300">
+              Session date {report.sessionDate}. The same evidence drives the
+              scorecard, citation blocks, rewrites, and practice plan.
+            </p>
+          </div>
           <Link
             href="/reports"
             className={cn(
               buttonVariants({
                 variant: "outline",
                 className:
-                  "mt-2 rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10",
+                  "rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10",
               }),
             )}
           >
             <ArrowLeft className="size-4" />
-            Back to report list
+            Back to reports home
           </Link>
         </div>
         <div className="rounded-[1.75rem] border border-white/10 bg-white/5 px-6 py-5 text-center shadow-[0_24px_80px_-40px_rgba(15,23,42,0.7)]">
