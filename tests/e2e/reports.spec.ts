@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("renders the reports catalog and opens the featured report", async ({
+test("redirects unauthenticated users into reports access", async ({
   page,
 }) => {
   await page.goto("/reports");

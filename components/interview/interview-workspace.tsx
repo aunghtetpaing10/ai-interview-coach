@@ -37,8 +37,8 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+    <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
         {label}
       </p>
       <p className="mt-2 text-lg font-semibold text-white">{value}</p>
@@ -60,16 +60,12 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     state.elapsedSeconds,
     state.durationSeconds,
   );
-  const remainingSeconds = Math.max(
-    0,
-    state.durationSeconds - state.elapsedSeconds,
-  );
+  const remainingSeconds = Math.max(0, state.durationSeconds - state.elapsedSeconds);
   const modeLocked =
     state.status === "connecting" ||
     state.status === "live" ||
     state.status === "paused";
-  const startDisabled =
-    state.status === "connecting" || state.status === "live";
+  const startDisabled = state.status === "connecting" || state.status === "live";
 
   useEffect(() => {
     return () => {
@@ -283,24 +279,31 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
   }
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <Card className="overflow-hidden border-slate-950/15 bg-slate-950 text-white shadow-[0_30px_110px_-50px_rgba(15,23,42,0.9)]">
-        <CardHeader className="gap-5 border-b border-white/10 bg-[linear-gradient(180deg,_rgba(255,255,255,0.08),_rgba(255,255,255,0))]">
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
+      <Card className="curator-card-dark overflow-hidden">
+        <CardHeader className="gap-5 border-b border-white/10 p-6 md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Badge className="rounded-full bg-white/10 px-3 py-1 text-white">
+            <Badge className="rounded-full bg-white/10 text-white">
               {state.realtime.label}
             </Badge>
-            <Badge variant="secondary" className="rounded-full bg-white/10 text-white">
-              {state.status}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="rounded-full bg-white/10 text-white">
+                {state.status}
+              </Badge>
+              <Badge variant="secondary" className="rounded-full bg-white/10 text-white">
+                {preset.label}
+              </Badge>
+            </div>
           </div>
           <div className="space-y-3">
-            <CardTitle className="text-3xl font-semibold tracking-[-0.04em]">
+            <p className="curator-kicker text-white/70">Live interview room</p>
+            <CardTitle className="curator-display text-4xl text-white sm:text-5xl">
               {state.candidateName} practicing for {state.targetRole}
             </CardTitle>
             <p className="max-w-3xl text-base leading-7 text-slate-300">
-              Connect the browser to OpenAI Realtime for voice, or keep moving
-              in text fallback when the transport cannot be established.
+              The Curator keeps the browser realtime connection, text fallback,
+              transcript persistence, and report queueing in a single editorial
+              rehearsal loop.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -317,7 +320,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
             <Progress value={progressPercent} className="h-2.5 bg-white/10" />
           </div>
         </CardHeader>
-        <CardContent className="grid gap-5 p-5">
+        <CardContent className="space-y-5 p-6 md:p-8">
           <TranscriptFeed
             transcript={state.transcript}
             currentPrompt={state.activePrompt}
@@ -325,7 +328,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
 
           <audio ref={audioRef} autoPlay playsInline className="hidden" />
 
-          <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4 md:p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
@@ -350,10 +353,10 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
                 })
               }
               placeholder={`Draft your answer to: ${state.activePrompt}`}
-              className="min-h-32 border-white/10 bg-black/20 text-white placeholder:text-slate-500"
+              className="mt-4 min-h-32 border-white/10 bg-black/20 text-white placeholder:text-slate-500"
             />
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -436,7 +439,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
                   buttonVariants({
                     size: "sm",
                     className:
-                      "rounded-full bg-[#1638d4] px-4 text-white hover:bg-[#112caa]",
+                      "rounded-full bg-[color:var(--curator-orange)] px-4 text-white hover:bg-[color:var(--curator-orange-strong)]",
                   }),
                 )}
               >
@@ -448,19 +451,19 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
         </CardContent>
       </Card>
 
-      <div className="space-y-6">
-        <Card className="border-slate-200/70 bg-white/80 shadow-[0_24px_90px_-50px_rgba(15,23,42,0.45)]">
-          <CardHeader className="space-y-3">
-            <Badge className="w-fit rounded-full bg-[#1638d4] px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-white">
+      <div className="space-y-6 xl:sticky xl:top-6">
+        <Card className="curator-card">
+          <CardHeader className="space-y-4">
+            <Badge className="w-fit rounded-full bg-[rgba(20,63,134,0.12)] text-[color:var(--curator-navy)]">
               Interview mode
             </Badge>
-            <CardTitle className="text-xl tracking-[-0.03em]">
+            <CardTitle className="text-2xl tracking-[-0.04em] text-[color:var(--curator-ink)]">
               Switch the session lens
             </CardTitle>
             <p className="text-sm leading-6 text-slate-600">
               The reducer resets the prompt ladder when the session is idle, so
-              each mode starts with a clean transcript and the right kind of
-              follow-ups.
+              each mode starts with a clean transcript and the right follow-up
+              pattern.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -469,29 +472,22 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
               onValueChange={handleModeChange}
               className="space-y-4"
             >
-              <TabsList className="grid w-full grid-cols-2 gap-2 bg-slate-100 p-1 sm:grid-cols-4">
-                {[
-                  "behavioral",
-                  "resume",
-                  "project",
-                  "system-design",
-                ].map((mode) => {
-                  const modePreset = getInterviewModePreset(mode as InterviewSessionState["mode"]);
+              <TabsList className="grid w-full grid-cols-2 gap-2 bg-[rgba(20,63,134,0.08)] p-1 sm:grid-cols-4">
+                {["behavioral", "resume", "project", "system-design"].map((mode) => {
+                  const modePreset = getInterviewModePreset(
+                    mode as InterviewSessionState["mode"],
+                  );
 
                   return (
-                    <TabsTrigger
-                      key={mode}
-                      value={mode}
-                      disabled={modeLocked}
-                    >
+                    <TabsTrigger key={mode} value={mode} disabled={modeLocked}>
                       {modePreset.label}
                     </TabsTrigger>
                   );
                 })}
               </TabsList>
             </Tabs>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="rounded-[1.5rem] border border-[color:var(--curator-line)] bg-white/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--curator-orange)]">
                 Focus area
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-700">
@@ -505,17 +501,17 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
               {preset.followUpPrompts.map((prompt) => (
                 <div
                   key={prompt}
-                  className="rounded-2xl border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700"
+                  className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3 text-sm leading-6 text-slate-700"
                 >
                   {prompt}
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <span className="text-sm font-medium text-slate-700">
+            <div className="flex items-center justify-between rounded-[1.5rem] border border-[color:var(--curator-line)] bg-[rgba(20,63,134,0.04)] px-4 py-3">
+              <span className="text-sm font-medium text-[color:var(--curator-ink)]">
                 Session status
               </span>
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-[color:var(--curator-navy)]">
                 {runtimeNotice ?? state.connectionMessage}
               </span>
             </div>
@@ -527,42 +523,42 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
           connectionMessage={state.connectionMessage}
         />
 
-        <Card className="border-slate-200/70 bg-white/80 shadow-[0_24px_90px_-50px_rgba(15,23,42,0.45)]">
-          <CardHeader className="space-y-3">
-            <Badge className="w-fit rounded-full bg-slate-950 px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-white">
+        <Card className="curator-card">
+          <CardHeader className="space-y-4">
+            <Badge className="w-fit rounded-full bg-[rgba(20,63,134,0.12)] text-[color:var(--curator-navy)]">
               Session notes
             </Badge>
-            <CardTitle className="text-xl tracking-[-0.03em]">
+            <CardTitle className="text-2xl tracking-[-0.04em] text-[color:var(--curator-ink)]">
               UI integration points
             </CardTitle>
             <p className="text-sm leading-6 text-slate-600">
-              This shell now negotiates a real OpenAI Realtime transport in the
+              This shell negotiates a real OpenAI Realtime transport in the
               browser and keeps the text fallback path available when voice
               setup is unavailable.
             </p>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-slate-700">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3">
               <strong>Transport:</strong> {state.realtime.provider}
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3">
               <strong>Route:</strong> {state.sessionId}
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3">
               <strong>Prompt ladder:</strong> {state.questionIndex + 1} turns
               generated from the current mode preset.
             </div>
             <Link
-              href="/"
+              href="/dashboard"
               className={cn(
                 buttonVariants({
                   variant: "outline",
                   className:
-                    "mt-2 flex w-full items-center justify-center rounded-full border-slate-300 bg-white",
+                    "mt-2 flex w-full items-center justify-center rounded-full border-[color:var(--curator-line)] bg-white",
                 }),
               )}
             >
-              Back to overview
+              Back to dashboard
               <ArrowRight className="size-4" />
             </Link>
           </CardContent>

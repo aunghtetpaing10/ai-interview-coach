@@ -76,7 +76,6 @@ export async function submitOnboardingDraft(
   }
 
   revalidatePath("/onboarding");
-  revalidatePath("/workspace");
   revalidatePath("/dashboard");
 
   return {

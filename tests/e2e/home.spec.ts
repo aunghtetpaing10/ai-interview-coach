@@ -7,11 +7,11 @@ test("renders the landing page and links to the dashboard", async ({
 
   await expect(
     page.getByRole("heading", {
-      name: /train for real software interviews/i,
+      name: /turn interview practice into measurable mastery/i,
     }),
   ).toBeVisible();
 
-  const dashboardLink = page.getByRole("link", { name: /explore the dashboard/i });
+  const dashboardLink = page.getByRole("link", { name: /open the dashboard/i });
   await expect(dashboardLink).toHaveAttribute("href", "/dashboard");
 
   await page.goto("/dashboard");

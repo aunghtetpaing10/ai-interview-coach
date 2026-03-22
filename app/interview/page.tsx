@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { requireWorkspaceUser } from "@/lib/auth/session";
 import { createPostgresInterviewRepository } from "@/lib/data/database-repository";
 import { getInterviewModePreset } from "@/lib/interview-session/catalog";
@@ -9,6 +10,8 @@ import { createDatabaseInterviewSessionStore } from "@/lib/session-service/datab
 import { createInterviewSessionService } from "@/lib/session-service/session-service";
 import type { InterviewMode } from "@/lib/types/interview";
 import { InterviewWorkspace } from "@/components/interview/interview-workspace";
+import { CandidateShell } from "@/components/workspace/candidate-shell";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -37,37 +40,83 @@ export default async function InterviewPage({
   const repository = createPostgresInterviewRepository();
   const sessionService = createInterviewSessionService(createDatabaseInterviewSessionStore());
   const workspace = await repository.getWorkspaceSnapshot(user.id);
+  const candidateLabel = workspace.profile?.fullName ?? user.email ?? "Candidate";
+  const shellHeadline =
+    workspace.profile?.headline ??
+    "Live interview rehearsal with transcript evidence and persisted follow-ups.";
 
   if (!workspace.targetRole || !workspace.profile) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-10 lg:px-10">
-        <Card className="border-slate-200/70 bg-white/90 shadow-[0_24px_90px_-50px_rgba(15,23,42,0.45)]">
-          <CardHeader className="space-y-4">
-            <p className="font-mono text-xs font-semibold uppercase tracking-[0.28em] text-[#1638d4]">
-              {INTERVIEW_ROUTE_COPY.eyebrow}
+      <CandidateShell
+        activeHref="/interview"
+        userLabel={candidateLabel}
+        headline={shellHeadline}
+        railNote="The live room needs onboarding context so prompts, scoring, and reports stay grounded."
+      >
+        <section className="grid gap-6 xl:grid-cols-[1.02fr_0.98fr] xl:items-end">
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge className="rounded-full bg-[rgba(20,63,134,0.12)] text-[color:var(--curator-navy)]">
+                Curator live room
+              </Badge>
+              <span className="font-mono text-xs uppercase tracking-[0.28em] text-[color:var(--curator-orange)]">
+                {INTERVIEW_ROUTE_COPY.eyebrow}
+              </span>
+            </div>
+            <h1 className="curator-display max-w-4xl text-5xl text-[color:var(--curator-ink)] sm:text-6xl">
+              Keep the rehearsal grounded in transcript evidence and queued follow-through.
+            </h1>
+            <p className="max-w-2xl text-base leading-7 text-slate-700">
+              The interview room needs a target role and saved profile context
+              before the live transcript, voice transport, and report queueing
+              can stay tied to real candidate data.
             </p>
-            <CardTitle className="text-3xl tracking-[-0.04em] text-slate-950">
-              Finish onboarding before starting the live room.
-            </CardTitle>
-            <CardDescription className="max-w-2xl text-base leading-7 text-slate-600">
-              The interview room needs a target role and saved profile context so the
-              prompts, report, and follow-ups stay grounded in real candidate data.
-            </CardDescription>
-          </CardHeader>
-          <CardHeader>
-            <Link
-              href="/onboarding"
-              className={cn(
-                buttonVariants({
-                  className: "w-fit rounded-full bg-slate-950 text-white hover:bg-slate-800",
-                }),
-              )}
-            >
-              Open onboarding
-            </Link>
-          </CardHeader>
-        </Card>
-      </main>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/onboarding"
+                className={cn(
+                  buttonVariants({
+                    size: "lg",
+                    className:
+                      "h-12 bg-[color:var(--curator-navy)] px-6 text-[color:var(--primary-foreground)] hover:bg-[color:var(--curator-navy-strong)]",
+                  }),
+                )}
+              >
+                Open onboarding
+              </Link>
+              <Link
+                href="/dashboard"
+                className={cn(
+                  buttonVariants({
+                    size: "lg",
+                    variant: "outline",
+                    className:
+                      "h-12 border-[color:var(--curator-line)] bg-white/72 px-6",
+                  }),
+                )}
+              >
+                Back to dashboard
+              </Link>
+            </div>
+          </div>
+
+          <Card className="curator-card-dark">
+            <CardHeader className="space-y-4 border-b border-white/10">
+              <Badge className="w-fit rounded-full bg-white/10 text-white">
+                Room requirements
+              </Badge>
+              <CardTitle className="curator-display text-4xl text-white">
+                A complete profile unlocks the live room.
+              </CardTitle>
+              <CardDescription className="text-base leading-7 text-slate-200">
+                Role context, interview targets, and resume details shape the
+                prompt ladder, the persisted transcript, and the scorecard
+                generated after the session ends.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </section>
+      </CandidateShell>
     );
   }
 
@@ -117,47 +166,57 @@ export default async function InterviewPage({
     targetRole: workspace.targetRole.title,
     realtime: createRealtimeSessionSnapshot(),
   });
+  const modePreset = getInterviewModePreset(session.mode);
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-6 py-10 lg:px-10">
-      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
-        <div className="space-y-4">
-          <p className="font-mono text-xs font-semibold uppercase tracking-[0.28em] text-[#1638d4]">
-            {INTERVIEW_ROUTE_COPY.eyebrow}
-          </p>
-          <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
-            {INTERVIEW_ROUTE_COPY.title}
+    <CandidateShell
+      activeHref="/interview"
+      userLabel={candidateLabel}
+      headline={shellHeadline}
+      railNote="The reducer-driven session remains deterministic while the route moves into the signed-in Curator shell."
+    >
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-end">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge className="rounded-full bg-[rgba(20,63,134,0.12)] text-[color:var(--curator-navy)]">
+              Curator live room
+            </Badge>
+            <span className="font-mono text-xs uppercase tracking-[0.28em] text-[color:var(--curator-orange)]">
+              {modePreset.label}
+            </span>
+          </div>
+          <h1 className="curator-display max-w-4xl text-5xl text-[color:var(--curator-ink)] sm:text-6xl">
+            Practice like the transcript is already under editorial review.
           </h1>
-          <p className="max-w-2xl text-base leading-7 text-slate-600">
-            {INTERVIEW_ROUTE_COPY.description}
+          <p className="max-w-2xl text-base leading-7 text-slate-700">
+            The Curator keeps a timed interview loop, transcript evidence,
+            and report queueing in the same workspace so the whole rehearsal
+            reads like a deliberate production workflow.
           </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {[
-            {
-              title: "Timer",
-              description: `${Math.round(session.durationSeconds / 60)} minute interview block.`,
-            },
-            {
-              title: "Transcript",
-              description: `${hydratedSession.transcriptTurns.length} persisted turns loaded.`,
-            },
-            {
-              title: "Transport",
-              description: session.realtime.label,
-            },
-          ].map((item) => (
-            <Card key={item.title} className="border-slate-200/70 bg-white/80">
-              <CardHeader className="pb-3">
-                <CardDescription>{item.title}</CardDescription>
-                <CardTitle className="text-lg">{item.description}</CardTitle>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
+
+        <Card className="curator-card">
+          <CardHeader className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(20,63,134,0.09)] text-[color:var(--curator-navy)]">
+                <Sparkles className="size-4" />
+              </div>
+              <div>
+                <p className="curator-kicker">Session at a glance</p>
+                <CardTitle className="mt-2 text-2xl tracking-[-0.04em] text-[color:var(--curator-ink)]">
+                  {workspace.targetRole.title}
+                </CardTitle>
+              </div>
+            </div>
+            <CardDescription className="text-base leading-7 text-slate-600">
+              The live room keeps transcript turns, transport state, and report
+              queueing in one deterministic loop.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </section>
 
       <InterviewWorkspace initialSession={session} />
-    </main>
+    </CandidateShell>
   );
 }

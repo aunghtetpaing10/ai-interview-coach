@@ -61,10 +61,8 @@ export function ProgressDashboard({
   quotaResetAt,
 }: ProgressDashboardProps) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.22),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_55%,_#020617_100%)]" />
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-10 lg:px-10">
-        <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+    <div className="space-y-8">
+      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <Card className="overflow-hidden border-white/10 bg-white/5 text-white shadow-[0_30px_120px_-60px_rgba(15,23,42,0.9)]">
             <CardHeader className="gap-6 border-b border-white/10 bg-[linear-gradient(180deg,_rgba(255,255,255,0.08),_rgba(255,255,255,0))]">
               <div className="flex items-center justify-between">
@@ -178,9 +176,9 @@ export function ProgressDashboard({
               </div>
             </CardContent>
           </Card>
-        </section>
+      </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <Card className="border-white/10 bg-white/90 text-slate-950 shadow-[0_24px_100px_-60px_rgba(15,23,42,0.85)]">
             <CardHeader className="gap-4">
               <SectionTitle
@@ -235,19 +233,18 @@ export function ProgressDashboard({
               </Tabs>
             </CardContent>
           </Card>
-        </section>
+      </section>
 
-        <IntegrationStatusGrid
-          posthog={posthog}
-          sentry={sentry}
-          rateLimit={rateLimit}
-          quotaUsed={quotaUsed}
-          quotaLimit={quotaLimit}
-          quotaResetAt={quotaResetAt}
-        />
+      <IntegrationStatusGrid
+        posthog={posthog}
+        sentry={sentry}
+        rateLimit={rateLimit}
+        quotaUsed={quotaUsed}
+        quotaLimit={quotaLimit}
+        quotaResetAt={quotaResetAt}
+      />
 
-        <SessionFeed sessions={snapshot.sessions} />
-      </div>
-    </main>
+      <SessionFeed sessions={snapshot.sessions} />
+    </div>
   );
 }

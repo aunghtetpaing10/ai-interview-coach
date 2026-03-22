@@ -35,13 +35,13 @@ function FieldError({ message }: { message?: string }) {
     return null;
   }
 
-  return <p className="text-sm text-rose-600">{message}</p>;
+  return <p className="text-sm text-[color:var(--destructive)]">{message}</p>;
 }
 
 function StepBadge({ step, label }: { step: string; label: string }) {
   return (
     <div className="flex items-center gap-3">
-      <Badge className="rounded-full bg-[#1638d4] px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white">
+      <Badge className="rounded-full bg-[color:var(--curator-navy)] text-white">
         {step}
       </Badge>
       <span className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -65,11 +65,11 @@ function SectionShell({
   label: string;
 }) {
   return (
-    <Card className="border-slate-200/70 bg-white/85 shadow-[0_16px_60px_-40px_rgba(15,23,42,0.25)]">
+    <Card className="curator-card">
       <CardHeader className="space-y-4">
         <StepBadge step={step} label={label} />
         <div className="space-y-2">
-          <CardTitle className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+          <CardTitle className="text-2xl font-semibold tracking-[-0.04em] text-[color:var(--curator-ink)]">
             {title}
           </CardTitle>
           <CardDescription className="max-w-2xl text-base leading-7 text-slate-600">
@@ -127,7 +127,7 @@ export function OnboardingFlow({
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+    <div className="grid gap-8 lg:grid-cols-[1.08fr_0.92fr]">
       <form
         key={formResetKey}
         action={formAction}
@@ -135,16 +135,16 @@ export function OnboardingFlow({
         className="space-y-6"
         aria-busy={pending}
       >
-        <section className="grid gap-3 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.3)]">
-          <Badge className="w-fit rounded-full bg-slate-950 text-white">
+        <section className="curator-card grid gap-4 p-6 md:p-8">
+          <Badge className="w-fit rounded-full bg-[color:var(--curator-navy)] text-white">
             Onboarding draft
           </Badge>
-          <h2 className="text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-4xl">
-            Set the target role, resume shell, and job description once.
+          <h2 className="curator-display text-4xl font-semibold text-[color:var(--curator-ink)] sm:text-5xl">
+            Set the target role, resume shell, and job description in one pass.
           </h2>
-          <p className="max-w-2xl text-base leading-7 text-slate-600">
-            This flow validates the inputs, persists them for the signed-in
-            user, and prepares the coach to ask grounded follow-ups from the
+          <p className="max-w-2xl text-base leading-7 text-slate-700">
+            The intake validates locally, persists to the signed-in user, and
+            gives The Curator enough signal to ask grounded follow-ups from the
             first session.
           </p>
         </section>
@@ -152,8 +152,8 @@ export function OnboardingFlow({
         <SectionShell
           step="01"
           label="Target role"
-          title="Tell the coach who you are targeting."
-          description="This determines the interview style, tone, and which domains deserve the most pressure-testing."
+          title="Tell The Curator who you are targeting."
+          description="This sets the interview voice, the pressure points, and which domains deserve the first round of scrutiny."
         >
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
@@ -164,7 +164,7 @@ export function OnboardingFlow({
                 placeholder="Backend Software Engineer"
                 aria-invalid={fieldErrors.roleTitle ? true : undefined}
                 className={cn(
-                  fieldErrors.roleTitle ? "border-rose-300 ring-rose-200" : "",
+                  fieldErrors.roleTitle ? "border-destructive ring-destructive/20" : "",
                 )}
               />
               <FieldError message={fieldErrors.roleTitle} />
@@ -175,7 +175,7 @@ export function OnboardingFlow({
                 <SelectTrigger
                   aria-invalid={fieldErrors.seniority ? true : undefined}
                   className={cn(
-                    fieldErrors.seniority ? "border-rose-300 ring-rose-200" : "",
+                    fieldErrors.seniority ? "border-destructive ring-destructive/20" : "",
                   )}
                 >
                   <SelectValue placeholder="Select a level" />
@@ -196,7 +196,7 @@ export function OnboardingFlow({
                 <SelectTrigger
                   aria-invalid={fieldErrors.companyType ? true : undefined}
                   className={cn(
-                    fieldErrors.companyType ? "border-rose-300 ring-rose-200" : "",
+                    fieldErrors.companyType ? "border-destructive ring-destructive/20" : "",
                   )}
                 >
                   <SelectValue placeholder="Select the company shape" />
@@ -219,7 +219,7 @@ export function OnboardingFlow({
                 placeholder="APIs, ownership, reliability"
                 aria-invalid={fieldErrors.focusAreas ? true : undefined}
                 className={cn(
-                  fieldErrors.focusAreas ? "border-rose-300 ring-rose-200" : "",
+                  fieldErrors.focusAreas ? "border-destructive ring-destructive/20" : "",
                 )}
               />
               <FieldError message={fieldErrors.focusAreas} />
@@ -236,14 +236,14 @@ export function OnboardingFlow({
           <div className="grid gap-4">
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Resume file</span>
-              <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3">
-                <FileUp className="size-4 text-slate-500" />
+              <div className="flex items-center gap-3 rounded-[1.4rem] border border-dashed border-[color:var(--curator-line)] bg-white/70 px-4 py-3">
+                <FileUp className="size-4 text-[color:var(--curator-navy)]" />
                 <Input
                   name="resumeFile"
                   type="file"
                   accept=".pdf,.doc,.docx,.txt,.md"
                   aria-invalid={fieldErrors.resumeFile ? true : undefined}
-                  className="border-0 bg-transparent p-0 shadow-none file:mr-3 file:rounded-full file:border-0 file:bg-slate-950 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
+                  className="border-0 bg-transparent p-0 shadow-none file:mr-3 file:rounded-full file:border-0 file:bg-[color:var(--curator-navy)] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
                 />
               </div>
               <FieldError message={fieldErrors.resumeFile} />
@@ -284,7 +284,7 @@ export function OnboardingFlow({
                   placeholder="Northstar"
                   aria-invalid={fieldErrors.companyName ? true : undefined}
                   className={cn(
-                    fieldErrors.companyName ? "border-rose-300 ring-rose-200" : "",
+                    fieldErrors.companyName ? "border-destructive ring-destructive/20" : "",
                   )}
                 />
                 <FieldError message={fieldErrors.companyName} />
@@ -297,7 +297,7 @@ export function OnboardingFlow({
                   placeholder="Software Engineer"
                   aria-invalid={fieldErrors.jobTitle ? true : undefined}
                   className={cn(
-                    fieldErrors.jobTitle ? "border-rose-300 ring-rose-200" : "",
+                    fieldErrors.jobTitle ? "border-destructive ring-destructive/20" : "",
                   )}
                 />
                 <FieldError message={fieldErrors.jobTitle} />
@@ -311,7 +311,7 @@ export function OnboardingFlow({
                 placeholder="https://example.com/jobs/backend-engineer"
                 aria-invalid={fieldErrors.jobUrl ? true : undefined}
                 className={cn(
-                  fieldErrors.jobUrl ? "border-rose-300 ring-rose-200" : "",
+                  fieldErrors.jobUrl ? "border-destructive ring-destructive/20" : "",
                 )}
               />
               <FieldError message={fieldErrors.jobUrl} />
@@ -324,7 +324,7 @@ export function OnboardingFlow({
                 placeholder="Paste the full job description here."
                 className={cn(
                   "min-h-40",
-                  fieldErrors.jobDescription ? "border-rose-300 ring-rose-200" : "",
+                  fieldErrors.jobDescription ? "border-destructive ring-destructive/20" : "",
                 )}
                 aria-invalid={fieldErrors.jobDescription ? true : undefined}
               />
@@ -333,21 +333,19 @@ export function OnboardingFlow({
           </div>
         </SectionShell>
 
-        <Card className="border-slate-200/70 bg-white/85">
+        <Card className="curator-card">
           <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Mock-safe action
-              </p>
+              <p className="curator-kicker">Mock-safe action</p>
               <p className="text-base text-slate-700">
                 The submit action validates the draft, persists it for the
-                authenticated user, and refreshes the workspace data model.
+                authenticated user, and refreshes the dashboard data model.
               </p>
             </div>
             <Button
               type="submit"
               disabled={pending}
-              className="h-11 rounded-full bg-slate-950 px-6 text-white hover:bg-slate-800"
+              className="h-12 rounded-full px-6"
             >
               Save onboarding draft
               <ArrowRight className="size-4" />
@@ -357,25 +355,29 @@ export function OnboardingFlow({
 
         <div
           aria-live="polite"
-          className="rounded-2xl border border-slate-200/70 bg-white/85 p-4 text-sm leading-6 text-slate-700 shadow-[0_12px_40px_-30px_rgba(15,23,42,0.35)]"
+          className="rounded-[1.4rem] border border-[color:var(--curator-line)] bg-white/80 p-4 text-sm leading-6 text-slate-700 shadow-[0_12px_40px_-30px_rgba(15,23,42,0.35)]"
         >
           {pending ? "Saving draft..." : clientMessage ?? currentState.message}
         </div>
       </form>
 
-      <div className="lg:pt-16">
+      <div className="lg:pt-4">
         <SummaryPanel state={currentState} pending={pending} />
-        <Card className="mt-6 border-slate-200/70 bg-white/85">
+        <Card className="mt-6 curator-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Sparkles className="size-4 text-[#1638d4]" />
+            <CardTitle className="flex items-center gap-2 text-xl text-[color:var(--curator-ink)]">
+              <Sparkles className="size-4 text-[color:var(--curator-navy)]" />
               Why this stands out
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-slate-600">
             <p>All validation is local and deterministic, so the UX is safe to demo.</p>
-            <Separator />
-            <p>The summary panel still updates from the server action state, but the saved data now hydrates the authenticated workspace and interview routes.</p>
+            <Separator className="curator-divider" />
+            <p>
+              The summary panel still updates from the server action state, but
+              the saved data now hydrates the authenticated workspace and
+              interview routes.
+            </p>
           </CardContent>
         </Card>
       </div>

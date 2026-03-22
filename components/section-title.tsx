@@ -15,14 +15,12 @@ export function SectionTitle({
 }: SectionTitleProps) {
   return (
     <div className={cn("space-y-3", className)}>
-      <p className="font-mono text-xs font-semibold uppercase tracking-[0.28em] text-[#1638d4]">
-        {eyebrow}
-      </p>
+      <p className="curator-kicker">{eyebrow}</p>
       <div className="space-y-3">
-        <h2 className="max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+        <h2 className="curator-display max-w-3xl text-4xl text-[color:var(--curator-ink)] sm:text-5xl">
           {title}
         </h2>
-        <p className="max-w-2xl text-base leading-7 text-slate-600">
+        <p className="max-w-2xl text-base leading-7 text-muted-foreground">
           {description}
         </p>
       </div>

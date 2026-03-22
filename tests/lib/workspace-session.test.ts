@@ -38,7 +38,7 @@ describe("workspace session helpers", () => {
     createSupabaseServerClientMock.mockResolvedValue(null);
 
     await expect(requireWorkspaceUser("/workspace")).rejects.toThrow(
-      "REDIRECT:/sign-in?next=%2Fworkspace",
+      "REDIRECT:/sign-in?next=%2Fdashboard",
     );
   });
 
@@ -53,7 +53,7 @@ describe("workspace session helpers", () => {
     });
 
     await expect(requireWorkspaceUser("/workspace")).rejects.toThrow(
-      "REDIRECT:/sign-in?next=%2Fworkspace",
+      "REDIRECT:/sign-in?next=%2Fdashboard",
     );
   });
 
