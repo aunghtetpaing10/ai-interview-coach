@@ -26,6 +26,7 @@ export interface DashboardReadModel {
   firstName: string;
   headline: string;
   targetRole: string;
+  activeModeLabel: string;
   heroDescription: string;
   stats: Array<{
     label: string;
@@ -35,6 +36,15 @@ export interface DashboardReadModel {
   }>;
   nextDrillTitle: string;
   nextDrillDescription: string;
+  latestSession: {
+    trackLabel: string;
+    focus: string;
+    note: string;
+    score: number;
+    durationMinutes: number;
+    followUps: number;
+    completedAtLabel: string;
+  } | null;
   latestReport: {
     id: string;
     title: string;
@@ -42,6 +52,25 @@ export interface DashboardReadModel {
     band: string;
     summary: string;
   } | null;
+  timeline: Array<{
+    label: string;
+    score: number;
+    trackLabel: string;
+  }>;
+  jobTarget: {
+    companyName: string;
+    jobTitle: string;
+    jobDescription: string;
+  } | null;
+  resumeAsset: {
+    fileName: string;
+    summary: string;
+  } | null;
+  questionPreview: Array<{
+    id: string;
+    modeLabel: string;
+    prompt: string;
+  }>;
   scorecards: DashboardModeCard[];
   practicePlan: DashboardPracticeStep[];
 }
@@ -94,6 +123,11 @@ function buildModeCards(reportOverviews: readonly ReportOverview[]): DashboardMo
   });
 }
 
+const SESSION_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+
 export function buildDashboardReadModel(input: {
   workspace: WorkspaceSnapshot;
   reportOverviews: readonly ReportOverview[];
@@ -118,6 +152,7 @@ export function buildDashboardReadModel(input: {
   return {
     firstName,
     headline: input.workspace.profile?.headline ?? "Interview practice dashboard",
+    activeModeLabel: getInterviewModeLabel(input.workspace.activeMode),
     targetRole,
     heroDescription: latestReport
       ? `${strongestTrack} is currently your strongest track, while ${weakestTrack.toLowerCase()} still needs a tighter explanation of constraints and tradeoffs.`
@@ -143,7 +178,7 @@ export function buildDashboardReadModel(input: {
         label: "Reports generated",
         value: String(input.reportOverviews.length),
         copy: input.reportOverviews.length > 0
-          ? "Each report is stored and can be reopened from the report catalog."
+          ? "Each report is stored and can be reopened from the latest feedback surface."
           : "Reports are generated asynchronously after a session completes.",
         icon: "report",
       },
@@ -163,6 +198,21 @@ export function buildDashboardReadModel(input: {
       latestReport?.practicePlan.steps[0]
         ? `${latestReport.practicePlan.steps[0].drill} ${latestReport.practicePlan.steps[0].outcome}`.trim()
         : "Use the interview room to create the first persisted transcript and report.",
+    latestSession: input.progressSnapshot
+      ? {
+          trackLabel: getInterviewModeLabel(
+            input.progressSnapshot.latestSession.track as InterviewMode,
+          ),
+          focus: input.progressSnapshot.latestSession.focus,
+          note: input.progressSnapshot.latestSession.note,
+          score: input.progressSnapshot.latestSession.score,
+          durationMinutes: input.progressSnapshot.latestSession.durationMinutes,
+          followUps: input.progressSnapshot.latestSession.followUps,
+          completedAtLabel: SESSION_DATE_FORMATTER.format(
+            new Date(input.progressSnapshot.latestSession.completedAt),
+          ),
+        }
+      : null,
     latestReport: latestReport
       ? {
           id: latestReport.id,
@@ -172,6 +222,29 @@ export function buildDashboardReadModel(input: {
           summary: latestReport.summary.headline,
         }
       : null,
+    timeline: input.progressSnapshot?.timeline.slice(-4).map((point) => ({
+      label: point.label,
+      score: point.score,
+      trackLabel: getInterviewModeLabel(point.track as InterviewMode),
+    })) ?? [],
+    jobTarget: input.workspace.jobTarget
+      ? {
+          companyName: input.workspace.jobTarget.companyName,
+          jobTitle: input.workspace.jobTarget.jobTitle,
+          jobDescription: input.workspace.jobTarget.jobDescription,
+        }
+      : null,
+    resumeAsset: input.workspace.resumeAsset
+      ? {
+          fileName: input.workspace.resumeAsset.fileName,
+          summary: input.workspace.resumeAsset.summary,
+        }
+      : null,
+    questionPreview: input.workspace.questionPreview.map((question) => ({
+      id: question.id,
+      modeLabel: getInterviewModeLabel(question.mode),
+      prompt: question.prompt,
+    })),
     scorecards: buildModeCards(input.reportOverviews),
     practicePlan:
       latestReport?.practicePlan.steps.map((step) => ({

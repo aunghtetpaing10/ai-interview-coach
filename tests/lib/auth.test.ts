@@ -33,15 +33,15 @@ describe("auth helpers", () => {
   });
 
   it("sanitizes post-auth redirect targets", () => {
-    expect(resolvePostAuthPath("/workspace?tab=sessions")).toBe("/workspace?tab=sessions");
-    expect(resolvePostAuthPath("https://example.com/workspace")).toBe("/workspace");
-    expect(resolvePostAuthPath("/sign-in")).toBe("/workspace");
-    expect(resolvePostAuthPath(undefined)).toBe("/workspace");
+    expect(resolvePostAuthPath("/workspace?tab=sessions")).toBe("/dashboard?tab=sessions");
+    expect(resolvePostAuthPath("https://example.com/workspace")).toBe("/dashboard");
+    expect(resolvePostAuthPath("/sign-in")).toBe("/dashboard");
+    expect(resolvePostAuthPath(undefined)).toBe("/dashboard");
   });
 
   it("builds auth entrypoint paths with safe next parameters", () => {
     expect(buildSignInPath("/workspace", "oauth_failed")).toBe(
-      "/sign-in?next=%2Fworkspace&error=oauth_failed",
+      "/sign-in?next=%2Fdashboard&error=oauth_failed",
     );
     expect(buildSignUpPath("/reports")).toBe("/sign-up?next=%2Freports");
     expect(buildAuthCallbackPath("/dashboard")).toBe("/auth/callback?next=%2Fdashboard");
@@ -202,6 +202,6 @@ describe("auth helpers", () => {
 
     await expect(
       resolvePostAuthDestination("user-1", "https://evil.example.com/dashboard"),
-    ).resolves.toBe("/workspace");
+    ).resolves.toBe("/dashboard");
   });
 });

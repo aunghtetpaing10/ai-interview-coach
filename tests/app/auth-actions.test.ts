@@ -44,7 +44,7 @@ function createSignInFormData(next = "/dashboard") {
   return formData;
 }
 
-function createSignUpFormData(next = "/workspace") {
+function createSignUpFormData(next = "/dashboard") {
   const formData = new FormData();
   formData.set("fullName", "Aung Htet Paing");
   formData.set("email", "candidate@example.com");
@@ -170,7 +170,7 @@ describe("auth actions", () => {
 
     await signUpAction(undefined, createSignUpFormData());
 
-    expect(resolvePostAuthDestinationMock).toHaveBeenCalledWith("user-1", "/workspace");
+    expect(resolvePostAuthDestinationMock).toHaveBeenCalledWith("user-1", "/dashboard");
     expect(revalidateProtectedPathsMock).toHaveBeenCalledTimes(1);
     expect(redirectMock).toHaveBeenCalledWith("/onboarding");
   });

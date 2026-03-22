@@ -96,7 +96,7 @@ describe("GET /auth/callback", () => {
     expect(resolvePostAuthDestinationMock).toHaveBeenCalledWith("user-1", "/dashboard");
   });
 
-  it("falls back to the workspace when next is unsafe", async () => {
+  it("falls back to the dashboard when next is unsafe", async () => {
     createSupabaseServerClientMock.mockResolvedValue({
       auth: {
         exchangeCodeForSession: vi.fn().mockResolvedValue({
@@ -112,14 +112,14 @@ describe("GET /auth/callback", () => {
         }),
       },
     });
-    resolvePostAuthDestinationMock.mockResolvedValue("/workspace");
+    resolvePostAuthDestinationMock.mockResolvedValue("/dashboard");
 
     const response = await GET(
       new Request("http://localhost/auth/callback?code=test-code&next=https%3A%2F%2Fevil.example"),
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("http://localhost/workspace");
+    expect(response.headers.get("location")).toBe("http://localhost/dashboard");
     expect(resolvePostAuthDestinationMock).toHaveBeenCalledWith("user-2", "https://evil.example");
   });
 });

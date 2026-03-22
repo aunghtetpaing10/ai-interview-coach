@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, LockKeyhole, Sparkles } from "lucide-react";
 import { signInAction, signUpAction } from "@/app/(auth)/actions";
 import type { AuthActionState, AuthFieldErrors } from "@/lib/auth/forms";
 import {
@@ -34,7 +34,7 @@ function FieldError({
     return null;
   }
 
-  return <p className="mt-1 text-sm text-red-600">{message}</p>;
+  return <p className="mt-1 text-sm text-red-700">{message}</p>;
 }
 
 function StatusMessage({
@@ -47,8 +47,8 @@ function StatusMessage({
   if (state?.message) {
     const tone =
       state.status === "needs_confirmation"
-        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-        : "border-rose-200 bg-rose-50 text-rose-700";
+        ? "border-emerald-200 bg-emerald-50/80 text-emerald-900"
+        : "border-rose-200 bg-rose-50/80 text-rose-700";
 
     return <p className={`rounded-2xl border px-4 py-3 text-sm ${tone}`}>{state.message}</p>;
   }
@@ -58,7 +58,7 @@ function StatusMessage({
   }
 
   return (
-    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+    <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
       {initialMessage}
     </p>
   );
@@ -105,7 +105,7 @@ function GoogleAuthButton({
       <Button
         type="button"
         variant="outline"
-        className="w-full rounded-full border-slate-300 bg-white hover:bg-slate-50"
+        className="h-11 w-full justify-center border-[color:var(--curator-line)] bg-white/88 text-[color:var(--curator-ink)] hover:bg-white"
         disabled={pending}
         onClick={handleGoogleAuth}
       >
@@ -113,6 +113,51 @@ function GoogleAuthButton({
       </Button>
       {errorMessage ? <p className="text-sm text-rose-700">{errorMessage}</p> : null}
     </div>
+  );
+}
+
+function AuthPanelShell({
+  eyebrow,
+  title,
+  description,
+  children,
+  footer,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+  footer: ReactNode;
+}) {
+  return (
+    <Card className="curator-card w-full max-w-[34rem] border-white/70 bg-white/82 backdrop-blur">
+      <CardHeader className="space-y-5 border-b border-[color:var(--curator-line)] pb-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-2">
+            <CardDescription className="curator-kicker">{eyebrow}</CardDescription>
+            <CardTitle className="font-serif text-5xl tracking-[-0.05em] text-[color:var(--curator-ink)]">
+              {title}
+            </CardTitle>
+          </div>
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-[color:var(--curator-navy)] text-[color:var(--primary-foreground)]">
+            <LockKeyhole className="size-5" />
+          </div>
+        </div>
+        <p className="max-w-lg text-sm leading-7 text-muted-foreground">
+          {description}
+        </p>
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--curator-orange)]">
+          <Sparkles className="size-3.5" />
+          Secure access to reports, transcripts, and rehearsal history
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5 pt-6">
+        {children}
+        <div className="border-t border-[color:var(--curator-line)] pt-5 text-sm text-muted-foreground">
+          {footer}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -126,57 +171,53 @@ export function SignInPanel({
   const [state, action, pending] = useActionState(signInAction, undefined);
 
   return (
-    <Card className="w-full max-w-xl border-white/70 bg-white/85 shadow-[0_28px_90px_-45px_rgba(15,23,42,0.45)] backdrop-blur">
-      <CardHeader className="space-y-4">
-        <CardDescription className="font-mono text-xs uppercase tracking-[0.28em] text-[#1638d4]">
-          Auth
-        </CardDescription>
-        <CardTitle className="text-3xl tracking-[-0.04em]">Sign in</CardTitle>
-        <p className="max-w-lg text-sm leading-6 text-slate-600">
-          Resume your interview prep, review your scorecards, and continue from the last session.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <StatusMessage state={state} initialMessage={initialMessage} />
-        <GoogleAuthButton label="Continue with Google" nextPath={nextPath} />
-        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-slate-400">
-          <span className="h-px flex-1 bg-slate-200" />
-          <span>Email and password</span>
-          <span className="h-px flex-1 bg-slate-200" />
-        </div>
-        <form action={action} className="space-y-5">
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <Input id="email" name="email" type="email" placeholder="you@example.com" />
-            <FieldError errors={state?.fieldErrors} name="email" />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <Input id="password" name="password" type="password" placeholder="password123" />
-            <FieldError errors={state?.fieldErrors} name="password" />
-          </div>
-          <input type="hidden" name="next" value={nextPath} />
-          <Button
-            type="submit"
-            className="w-full rounded-full bg-slate-950 text-white hover:bg-slate-800"
-            disabled={pending}
-          >
-            {pending ? "Signing in..." : "Sign in"}
-            <ArrowRight className="size-4" />
-          </Button>
-        </form>
-        <p className="text-sm text-slate-600">
+    <AuthPanelShell
+      eyebrow="Workspace access"
+      title="Sign in"
+      description="Resume your interview prep, review the latest report, and continue the next deliberate rehearsal without losing the evidence trail."
+      footer={
+        <p>
           New here?{" "}
-          <Link className="font-medium text-[#1638d4]" href={buildSignUpPath(nextPath)}>
+          <Link className="font-semibold text-[color:var(--curator-navy)]" href={buildSignUpPath(nextPath)}>
             Create an account
           </Link>
         </p>
-      </CardContent>
-    </Card>
+      }
+    >
+      <StatusMessage state={state} initialMessage={initialMessage} />
+      <GoogleAuthButton label="Continue with Google" nextPath={nextPath} />
+      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="h-px flex-1 bg-[color:var(--curator-line)]" />
+        <span>Email and password</span>
+        <span className="h-px flex-1 bg-[color:var(--curator-line)]" />
+      </div>
+      <form action={action} className="space-y-5">
+        <div className="space-y-2">
+          <label htmlFor="email" className="text-sm font-medium text-[color:var(--curator-ink)]">
+            Email
+          </label>
+          <Input id="email" name="email" type="email" placeholder="you@example.com" />
+          <FieldError errors={state?.fieldErrors} name="email" />
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="password" className="text-sm font-medium text-[color:var(--curator-ink)]">
+            Password
+          </label>
+          <Input id="password" name="password" type="password" placeholder="password123" />
+          <FieldError errors={state?.fieldErrors} name="password" />
+        </div>
+        <input type="hidden" name="next" value={nextPath} />
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={pending}
+        >
+          {pending ? "Signing in..." : "Sign in"}
+          <ArrowRight className="size-4" />
+        </Button>
+      </form>
+    </AuthPanelShell>
   );
 }
 
@@ -188,63 +229,59 @@ export function SignUpPanel({
   const [state, action, pending] = useActionState(signUpAction, undefined);
 
   return (
-    <Card className="w-full max-w-xl border-white/70 bg-white/85 shadow-[0_28px_90px_-45px_rgba(15,23,42,0.45)] backdrop-blur">
-      <CardHeader className="space-y-4">
-        <CardDescription className="font-mono text-xs uppercase tracking-[0.28em] text-[#1638d4]">
-          Auth
-        </CardDescription>
-        <CardTitle className="text-3xl tracking-[-0.04em]">Create account</CardTitle>
-        <p className="max-w-lg text-sm leading-6 text-slate-600">
-          Create the account first, then finish role and resume setup in onboarding.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <StatusMessage state={state} />
-        <GoogleAuthButton label="Continue with Google" nextPath={nextPath} />
-        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-slate-400">
-          <span className="h-px flex-1 bg-slate-200" />
-          <span>Email and password</span>
-          <span className="h-px flex-1 bg-slate-200" />
-        </div>
-        <form action={action} className="space-y-5">
-          <div className="space-y-2">
-            <label htmlFor="fullName" className="text-sm font-medium text-slate-700">
-              Full name
-            </label>
-            <Input id="fullName" name="fullName" placeholder="Aung Htet Paing" />
-            <FieldError errors={state?.fieldErrors} name="fullName" />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <Input id="email" name="email" type="email" placeholder="you@example.com" />
-            <FieldError errors={state?.fieldErrors} name="email" />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <Input id="password" name="password" type="password" placeholder="password123" />
-            <FieldError errors={state?.fieldErrors} name="password" />
-          </div>
-          <input type="hidden" name="next" value={nextPath} />
-          <Button
-            type="submit"
-            className="w-full rounded-full bg-slate-950 text-white hover:bg-slate-800"
-            disabled={pending}
-          >
-            {pending ? "Creating account..." : "Create account"}
-            <ArrowRight className="size-4" />
-          </Button>
-        </form>
-        <p className="text-sm text-slate-600">
+    <AuthPanelShell
+      eyebrow="Create access"
+      title="Create account"
+      description="Create the secure account first, then finish the role and resume setup that powers the Curator interview loop."
+      footer={
+        <p>
           Already have an account?{" "}
-          <Link className="font-medium text-[#1638d4]" href={buildSignInPath(nextPath)}>
+          <Link className="font-semibold text-[color:var(--curator-navy)]" href={buildSignInPath(nextPath)}>
             Sign in
           </Link>
         </p>
-      </CardContent>
-    </Card>
+      }
+    >
+      <StatusMessage state={state} />
+      <GoogleAuthButton label="Continue with Google" nextPath={nextPath} />
+      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="h-px flex-1 bg-[color:var(--curator-line)]" />
+        <span>Email and password</span>
+        <span className="h-px flex-1 bg-[color:var(--curator-line)]" />
+      </div>
+      <form action={action} className="space-y-5">
+        <div className="space-y-2">
+          <label htmlFor="fullName" className="text-sm font-medium text-[color:var(--curator-ink)]">
+            Full name
+          </label>
+          <Input id="fullName" name="fullName" placeholder="Aung Htet Paing" />
+          <FieldError errors={state?.fieldErrors} name="fullName" />
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="email" className="text-sm font-medium text-[color:var(--curator-ink)]">
+            Email
+          </label>
+          <Input id="email" name="email" type="email" placeholder="you@example.com" />
+          <FieldError errors={state?.fieldErrors} name="email" />
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="password" className="text-sm font-medium text-[color:var(--curator-ink)]">
+            Password
+          </label>
+          <Input id="password" name="password" type="password" placeholder="password123" />
+          <FieldError errors={state?.fieldErrors} name="password" />
+        </div>
+        <input type="hidden" name="next" value={nextPath} />
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={pending}
+        >
+          {pending ? "Creating account..." : "Create account"}
+          <ArrowRight className="size-4" />
+        </Button>
+      </form>
+    </AuthPanelShell>
   );
 }

@@ -169,8 +169,12 @@ describe("buildDashboardReadModel", () => {
     });
 
     expect(model.firstName).toBe("Aung");
+    expect(model.activeModeLabel).toBe("System design");
     expect(model.stats[0]?.value).toBe("improving");
     expect(model.stats[1]?.value).toBe("3");
+    expect(model.latestSession?.trackLabel).toBe("Project walkthrough");
+    expect(model.timeline).toHaveLength(0);
+    expect(model.questionPreview).toHaveLength(0);
     expect(model.practicePlan[0]?.title).toBe("Lead with tradeoffs");
     expect(model.scorecards.find((card) => card.mode === "project")?.competencies[0]?.score).toBeGreaterThan(0);
   });
@@ -186,6 +190,7 @@ describe("buildDashboardReadModel", () => {
 
     expect(model.stats[1]?.value).toBe("0");
     expect(model.practicePlan).toHaveLength(0);
+    expect(model.latestSession).toBeNull();
     expect(model.heroDescription).toMatch(/save onboarding data/i);
   });
 });
