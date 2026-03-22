@@ -67,7 +67,7 @@ export default async function OnboardingPage() {
           </Card>
         </section>
 
-        <OnboardingFlow initialDraft={draft} initialState={initialState} />
+        <OnboardingFlow initialState={initialState} />
       </div>
     </main>
   );

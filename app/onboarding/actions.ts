@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 import { requireWorkspaceUser } from "@/lib/auth/session";
 import type { OnboardingSubmissionState } from "@/lib/intake/types";
 import { makeOnboardingStateMessage, saveOnboardingDraftForUser } from "@/lib/intake/persistence";
+import { buildOnboardingFormValues } from "@/lib/intake/state";
 import { buildOnboardingSummary } from "@/lib/intake/summary";
-import { safeParseOnboardingDraftFromFormData } from "@/lib/intake/validation";
+import {
+  readOnboardingFormValues,
+  safeParseOnboardingDraftFromFormData,
+} from "@/lib/intake/validation";
 
 export async function submitOnboardingDraft(
   previousState: OnboardingSubmissionState,
@@ -17,6 +21,7 @@ export async function submitOnboardingDraft(
     return {
       status: "error",
       message: parsed.message,
+      formValues: readOnboardingFormValues(formData),
       summary: previousState.summary,
       fieldErrors: parsed.fieldErrors,
     };
@@ -39,6 +44,7 @@ export async function submitOnboardingDraft(
     return {
       status: "error",
       message: error instanceof Error ? error.message : "Failed to save onboarding draft.",
+      formValues: buildOnboardingFormValues(draft),
       summary: previousState.summary,
       fieldErrors: {},
     };
@@ -51,6 +57,7 @@ export async function submitOnboardingDraft(
   return {
     status: "success",
     message: makeOnboardingStateMessage(summary.completion),
+    formValues: buildOnboardingFormValues(draft),
     summary,
     fieldErrors: {},
   };

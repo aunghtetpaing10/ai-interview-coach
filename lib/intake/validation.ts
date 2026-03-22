@@ -5,6 +5,7 @@ import {
 } from "@/lib/resume/parser";
 import type {
   OnboardingDraft,
+  OnboardingFormValues,
   OnboardingFieldName,
 } from "@/lib/intake/types";
 
@@ -51,6 +52,20 @@ export function normalizeCommaSeparatedList(value: string) {
   );
 }
 
+export function readOnboardingFormValues(formData: FormData): OnboardingFormValues {
+  return {
+    roleTitle: readTextField(formData, "roleTitle"),
+    seniority: readTextField(formData, "seniority"),
+    companyType: readTextField(formData, "companyType"),
+    focusAreas: readTextField(formData, "focusAreas"),
+    companyName: readTextField(formData, "companyName"),
+    jobTitle: readTextField(formData, "jobTitle"),
+    jobUrl: readTextField(formData, "jobUrl"),
+    jobDescription: readTextField(formData, "jobDescription"),
+    resumeNotes: readTextField(formData, "resumeNotes"),
+  };
+}
+
 export function createOnboardingDraftFromFormData(formData: FormData): OnboardingDraft {
   const parsed = safeParseOnboardingDraftFromFormData(formData);
 
@@ -64,17 +79,8 @@ export function createOnboardingDraftFromFormData(formData: FormData): Onboardin
 export function safeParseOnboardingDraftFromFormData(formData: FormData):
   | { success: true; draft: OnboardingDraft }
   | { success: false; message: string; fieldErrors: Partial<Record<OnboardingFieldName, string>> } {
-  const parsed = onboardingFormSchema.safeParse({
-    roleTitle: readTextField(formData, "roleTitle"),
-    seniority: readTextField(formData, "seniority"),
-    companyType: readTextField(formData, "companyType"),
-    focusAreas: readTextField(formData, "focusAreas"),
-    companyName: readTextField(formData, "companyName"),
-    jobTitle: readTextField(formData, "jobTitle"),
-    jobUrl: readTextField(formData, "jobUrl"),
-    jobDescription: readTextField(formData, "jobDescription"),
-    resumeNotes: readTextField(formData, "resumeNotes"),
-  });
+  const formValues = readOnboardingFormValues(formData);
+  const parsed = onboardingFormSchema.safeParse(formValues);
 
   if (!parsed.success) {
     const fieldErrors: Partial<Record<OnboardingFieldName, string>> = {};

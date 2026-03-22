@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import type { OnboardingDraft, OnboardingSubmissionState } from "@/lib/intake/types";
+import type { OnboardingSubmissionState } from "@/lib/intake/types";
 import { submitOnboardingDraft } from "@/app/onboarding/actions";
 import { SummaryPanel } from "@/components/intake/summary-panel";
 
@@ -79,10 +79,8 @@ function SectionShell({
 }
 
 export function OnboardingFlow({
-  initialDraft,
   initialState,
 }: {
-  initialDraft: OnboardingDraft;
   initialState: OnboardingSubmissionState;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -92,6 +90,7 @@ export function OnboardingFlow({
 
   const currentState: OnboardingSubmissionState = state;
   const fieldErrors = currentState.fieldErrors;
+  const formValues = currentState.formValues;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
@@ -121,7 +120,7 @@ export function OnboardingFlow({
               <span className="text-sm font-medium text-slate-700">Role title</span>
               <Input
                 name="roleTitle"
-                defaultValue={initialDraft.roleTitle}
+                defaultValue={formValues.roleTitle}
                 placeholder="Backend Software Engineer"
                 aria-invalid={fieldErrors.roleTitle ? true : undefined}
                 className={cn(
@@ -132,7 +131,7 @@ export function OnboardingFlow({
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Seniority</span>
-              <Select name="seniority" defaultValue={initialDraft.seniority}>
+              <Select name="seniority" defaultValue={formValues.seniority}>
                 <SelectTrigger
                   aria-invalid={fieldErrors.seniority ? true : undefined}
                   className={cn(
@@ -153,7 +152,7 @@ export function OnboardingFlow({
             </label>
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Company type</span>
-              <Select name="companyType" defaultValue={initialDraft.companyType}>
+              <Select name="companyType" defaultValue={formValues.companyType}>
                 <SelectTrigger
                   aria-invalid={fieldErrors.companyType ? true : undefined}
                   className={cn(
@@ -176,7 +175,7 @@ export function OnboardingFlow({
               <span className="text-sm font-medium text-slate-700">Focus areas</span>
               <Input
                 name="focusAreas"
-                defaultValue={initialDraft.focusAreas.join(", ")}
+                defaultValue={formValues.focusAreas}
                 placeholder="APIs, ownership, reliability"
                 aria-invalid={fieldErrors.focusAreas ? true : undefined}
                 className={cn(
@@ -215,7 +214,7 @@ export function OnboardingFlow({
               </span>
               <Textarea
                 name="resumeNotes"
-                defaultValue={initialDraft.resumeNotes}
+                defaultValue={formValues.resumeNotes}
                 placeholder="Paste a compact resume summary or bullet points here."
                 className="min-h-32"
                 aria-invalid={fieldErrors.resumeNotes ? true : undefined}
@@ -241,7 +240,7 @@ export function OnboardingFlow({
                 <span className="text-sm font-medium text-slate-700">Company name</span>
                 <Input
                   name="companyName"
-                  defaultValue={initialDraft.companyName}
+                  defaultValue={formValues.companyName}
                   placeholder="Northstar"
                   aria-invalid={fieldErrors.companyName ? true : undefined}
                   className={cn(
@@ -254,7 +253,7 @@ export function OnboardingFlow({
                 <span className="text-sm font-medium text-slate-700">Job title</span>
                 <Input
                   name="jobTitle"
-                  defaultValue={initialDraft.jobTitle}
+                  defaultValue={formValues.jobTitle}
                   placeholder="Software Engineer"
                   aria-invalid={fieldErrors.jobTitle ? true : undefined}
                   className={cn(
@@ -268,7 +267,7 @@ export function OnboardingFlow({
               <span className="text-sm font-medium text-slate-700">Job URL</span>
               <Input
                 name="jobUrl"
-                defaultValue={initialDraft.jobUrl}
+                defaultValue={formValues.jobUrl}
                 placeholder="https://example.com/jobs/backend-engineer"
                 aria-invalid={fieldErrors.jobUrl ? true : undefined}
                 className={cn(
@@ -281,7 +280,7 @@ export function OnboardingFlow({
               <span className="text-sm font-medium text-slate-700">Job description</span>
               <Textarea
                 name="jobDescription"
-                defaultValue={initialDraft.jobDescription}
+                defaultValue={formValues.jobDescription}
                 placeholder="Paste the full job description here."
                 className={cn(
                   "min-h-40",

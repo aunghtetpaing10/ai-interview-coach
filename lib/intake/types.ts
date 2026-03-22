@@ -45,6 +45,18 @@ export interface OnboardingDraft {
   resumePreview: ResumeUploadPreview;
 }
 
+export interface OnboardingFormValues {
+  roleTitle: string;
+  seniority: string;
+  companyType: string;
+  focusAreas: string;
+  companyName: string;
+  jobTitle: string;
+  jobUrl: string;
+  jobDescription: string;
+  resumeNotes: string;
+}
+
 export interface OnboardingSummary {
   completion: number;
   readinessLabel: string;
@@ -59,6 +71,7 @@ export interface OnboardingSummary {
 export interface OnboardingSubmissionState {
   status: "idle" | "success" | "error";
   message: string;
+  formValues: OnboardingFormValues;
   summary: OnboardingSummary;
   fieldErrors: Partial<Record<OnboardingFieldName, string>>;
 }

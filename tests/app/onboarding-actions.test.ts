@@ -71,6 +71,8 @@ describe("submitOnboardingDraft", () => {
     expect(result.message).toMatch(/draft saved/i);
     expect(result.summary.recommendedTracks).toContain("resume");
     expect(result.fieldErrors).toEqual({});
+    expect(result.formValues.roleTitle).toBe("Backend Software Engineer");
+    expect(result.formValues.focusAreas).toBe("APIs, ownership, scalability");
     expect(saveOnboardingDraftForUserMock).toHaveBeenCalledTimes(1);
     expect(saveOnboardingDraftForUserMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -93,5 +95,9 @@ describe("submitOnboardingDraft", () => {
     expect(result.summary).toEqual(previousState.summary);
     expect(result.fieldErrors.roleTitle).toMatch(/target role title/i);
     expect(result.fieldErrors.jobDescription).toMatch(/job description/i);
+    expect(result.formValues.roleTitle).toBe("BE");
+    expect(result.formValues.seniority).toBe("mid-level");
+    expect(result.formValues.companyType).toBe("startup");
+    expect(result.formValues.jobDescription).toBe("");
   });
 });
