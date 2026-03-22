@@ -1,9 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { signInSchema, signUpSchema, type AuthActionState } from "@/lib/auth/forms";
-import { buildSignInPath, resolvePostAuthPath } from "@/lib/auth/paths";
+import {
+  buildAuthActionState,
+  signInSchema,
+  signUpSchema,
+  type AuthActionState,
+} from "@/lib/auth/forms";
+import { revalidateProtectedPaths } from "@/lib/auth/cache";
+import { resolvePostAuthDestination } from "@/lib/auth/destination";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getFieldErrorMessage(error: unknown) {
@@ -17,33 +22,41 @@ export async function signInAction(
   const parsed = signInSchema.safeParse(Object.fromEntries(formData.entries()));
 
   if (!parsed.success) {
-    return {
-      message: "Check the fields and try again.",
-      fieldErrors: parsed.error.flatten().fieldErrors,
-    };
+    return buildAuthActionState(
+      "error",
+      "Check the fields and try again.",
+      parsed.error.flatten().fieldErrors,
+    );
   }
 
   const supabase = await createSupabaseServerClient({ writeCookies: true });
 
   if (!supabase) {
-    return {
-      message: "Supabase credentials are not configured yet.",
-    };
+    return buildAuthActionState("error", "Supabase credentials are not configured yet.");
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
 
   if (error) {
-    return {
-      message: getFieldErrorMessage(error),
-    };
+    return buildAuthActionState("error", getFieldErrorMessage(error));
   }
 
-  revalidatePath("/workspace");
-  redirect(resolvePostAuthPath(parsed.data.next));
+  if (!data.user) {
+    return buildAuthActionState("error", "Unable to complete sign in.");
+  }
+
+  let destination: string;
+  try {
+    destination = await resolvePostAuthDestination(data.user.id, parsed.data.next);
+  } catch (error) {
+    return buildAuthActionState("error", getFieldErrorMessage(error));
+  }
+
+  revalidateProtectedPaths();
+  redirect(destination);
 }
 
 export async function signUpAction(
@@ -53,37 +66,62 @@ export async function signUpAction(
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData.entries()));
 
   if (!parsed.success) {
-    return {
-      message: "Check the fields and try again.",
-      fieldErrors: parsed.error.flatten().fieldErrors,
-    };
+    return buildAuthActionState(
+      "error",
+      "Check the fields and try again.",
+      parsed.error.flatten().fieldErrors,
+    );
   }
 
   const supabase = await createSupabaseServerClient({ writeCookies: true });
 
   if (!supabase) {
-    return {
-      message: "Supabase credentials are not configured yet.",
-    };
+    return buildAuthActionState("error", "Supabase credentials are not configured yet.");
   }
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: {
         full_name: parsed.data.fullName,
-        target_role: parsed.data.targetRole,
       },
     },
   });
 
   if (error) {
-    return {
-      message: getFieldErrorMessage(error),
-    };
+    return buildAuthActionState("error", getFieldErrorMessage(error));
   }
 
-  revalidatePath("/workspace");
-  redirect(buildSignInPath(parsed.data.next ?? "/workspace"));
+  if (!data.session) {
+    return buildAuthActionState(
+      "needs_confirmation",
+      "Check your inbox to confirm the account before signing in.",
+    );
+  }
+
+  if (!data.user) {
+    return buildAuthActionState("error", "Unable to complete sign up.");
+  }
+
+  let destination: string;
+  try {
+    destination = await resolvePostAuthDestination(data.user.id, parsed.data.next);
+  } catch (error) {
+    return buildAuthActionState("error", getFieldErrorMessage(error));
+  }
+
+  revalidateProtectedPaths();
+  redirect(destination);
+}
+
+export async function signOutAction(): Promise<void> {
+  const supabase = await createSupabaseServerClient({ writeCookies: true });
+
+  if (supabase) {
+    await supabase.auth.signOut();
+  }
+
+  revalidateProtectedPaths();
+  redirect("/sign-in");
 }
