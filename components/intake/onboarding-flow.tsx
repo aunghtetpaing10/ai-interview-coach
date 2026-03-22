@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import { useActionState, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, FileUp, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { safeParseOnboardingDraftFromFormData } from "@/lib/intake/validation";
 import {
   Select,
   SelectContent,
@@ -22,7 +23,10 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import type { OnboardingSubmissionState } from "@/lib/intake/types";
+import type {
+  OnboardingFieldName,
+  OnboardingSubmissionState,
+} from "@/lib/intake/types";
 import { submitOnboardingDraft } from "@/app/onboarding/actions";
 import { SummaryPanel } from "@/components/intake/summary-panel";
 
@@ -87,9 +91,14 @@ export function OnboardingFlow({
     submitOnboardingDraft,
     initialState,
   );
+  const [clientFieldErrors, setClientFieldErrors] = useState<
+    Partial<Record<OnboardingFieldName, string>>
+  >({});
+  const [clientMessage, setClientMessage] = useState<string | null>(null);
 
   const currentState: OnboardingSubmissionState = state;
-  const fieldErrors = currentState.fieldErrors;
+  const hasClientValidation = Object.keys(clientFieldErrors).length > 0;
+  const fieldErrors = hasClientValidation ? clientFieldErrors : currentState.fieldErrors;
   const formValues = currentState.formValues;
   const formResetKey = [
     formValues.roleTitle,
@@ -103,11 +112,26 @@ export function OnboardingFlow({
     formValues.resumeNotes,
   ].join("\u0000");
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const parsed = safeParseOnboardingDraftFromFormData(new FormData(event.currentTarget));
+
+    if (!parsed.success) {
+      event.preventDefault();
+      setClientFieldErrors(parsed.fieldErrors);
+      setClientMessage(parsed.message);
+      return;
+    }
+
+    setClientFieldErrors({});
+    setClientMessage(null);
+  }
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
       <form
         key={formResetKey}
         action={formAction}
+        onSubmit={handleSubmit}
         className="space-y-6"
         aria-busy={pending}
       >
@@ -335,7 +359,7 @@ export function OnboardingFlow({
           aria-live="polite"
           className="rounded-2xl border border-slate-200/70 bg-white/85 p-4 text-sm leading-6 text-slate-700 shadow-[0_12px_40px_-30px_rgba(15,23,42,0.35)]"
         >
-          {pending ? "Saving draft..." : currentState.message}
+          {pending ? "Saving draft..." : clientMessage ?? currentState.message}
         </div>
       </form>
 

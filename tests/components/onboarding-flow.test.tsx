@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { useActionStateMock } = vi.hoisted(() => ({
   useActionStateMock: vi.fn(),
@@ -28,6 +29,10 @@ import { OnboardingFlow } from "@/components/intake/onboarding-flow";
 import { createInitialOnboardingState } from "@/lib/intake/state";
 
 describe("OnboardingFlow", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     useActionStateMock.mockReset();
   });
@@ -87,5 +92,24 @@ describe("OnboardingFlow", () => {
     expect(screen.getByDisplayValue("https://example.com/typed")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Typed resume notes")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Initial role")).not.toBeInTheDocument();
+  });
+
+  it("keeps the selected resume file when missing fields block the submit locally", async () => {
+    const user = userEvent.setup();
+    const initialState = createInitialOnboardingState();
+
+    useActionStateMock.mockReturnValue([initialState, vi.fn(), false]);
+
+    render(<OnboardingFlow initialState={initialState} />);
+
+    const resumeFileInput = screen.getByLabelText(/resume file/i) as HTMLInputElement;
+    const file = new File(["resume"], "resume.pdf", { type: "application/pdf" });
+
+    await user.upload(resumeFileInput, file);
+    await user.click(screen.getByRole("button", { name: /save onboarding draft/i }));
+
+    expect(screen.getAllByText(/add the target role title/i).length).toBeGreaterThan(0);
+    expect(resumeFileInput.files).toHaveLength(1);
+    expect(resumeFileInput.files?.[0]?.name).toBe("resume.pdf");
   });
 });
