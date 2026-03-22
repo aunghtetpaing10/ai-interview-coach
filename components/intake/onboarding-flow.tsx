@@ -91,10 +91,26 @@ export function OnboardingFlow({
   const currentState: OnboardingSubmissionState = state;
   const fieldErrors = currentState.fieldErrors;
   const formValues = currentState.formValues;
+  const formResetKey = [
+    formValues.roleTitle,
+    formValues.seniority,
+    formValues.companyType,
+    formValues.focusAreas,
+    formValues.companyName,
+    formValues.jobTitle,
+    formValues.jobUrl,
+    formValues.jobDescription,
+    formValues.resumeNotes,
+  ].join("\u0000");
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-      <form action={formAction} className="space-y-6" aria-busy={pending}>
+      <form
+        key={formResetKey}
+        action={formAction}
+        className="space-y-6"
+        aria-busy={pending}
+      >
         <section className="grid gap-3 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.3)]">
           <Badge className="w-fit rounded-full bg-slate-950 text-white">
             Onboarding draft
