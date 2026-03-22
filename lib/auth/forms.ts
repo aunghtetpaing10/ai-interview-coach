@@ -19,10 +19,6 @@ export const signUpSchema = z.object({
     .string()
     .min(8, { error: "Password must be at least 8 characters long." })
     .trim(),
-  targetRole: z
-    .string()
-    .min(2, { error: "Target role must be at least 2 characters long." })
-    .trim(),
   next: z.string().optional(),
 });
 
@@ -32,16 +28,19 @@ export type AuthFieldErrors = Partial<
 
 export type AuthActionState =
   | {
-      message?: string;
+      status: "error" | "needs_confirmation";
+      message: string;
       fieldErrors?: AuthFieldErrors;
     }
   | undefined;
 
 export function buildAuthActionState(
+  status: NonNullable<AuthActionState>["status"],
   message: string,
   fieldErrors?: AuthFieldErrors,
 ): AuthActionState {
   return {
+    status,
     message,
     fieldErrors,
   };

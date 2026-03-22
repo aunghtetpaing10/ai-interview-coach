@@ -2,8 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireWorkspaceUser } from "@/lib/auth/session";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export default async function WorkspaceLayout({
   children,
@@ -28,16 +27,7 @@ export default async function WorkspaceLayout({
               Protected candidate shell for {user.email}
             </p>
           </Link>
-          <Link
-            href="/sign-in"
-            className={cn(
-              buttonVariants({
-                className: "rounded-full bg-slate-950 text-white hover:bg-slate-800",
-              }),
-            )}
-          >
-            Switch account
-          </Link>
+          <SignOutButton />
         </div>
       </header>
       <main className="mx-auto w-full max-w-7xl px-6 py-10 lg:px-10">{children}</main>
