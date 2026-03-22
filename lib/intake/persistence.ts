@@ -11,7 +11,7 @@ import {
   type ResumeAssetRow,
   type TargetRoleRow,
 } from "@/db/schema";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createPostgresInterviewRepository } from "@/lib/data/database-repository";
 import type { WorkspaceSnapshot } from "@/lib/data/repository";
 import { getDb } from "@/lib/db/client";
@@ -28,6 +28,8 @@ type SaveOnboardingDraftInput = {
   draft: OnboardingDraft;
   file: File | null;
 };
+
+const RESUME_ASSETS_BUCKET = "resume-assets";
 
 function titleCaseWord(value: string) {
   if (!value) {
@@ -140,10 +142,40 @@ export async function loadOnboardingDraftForUser(userId: string) {
 }
 
 async function uploadResumeFile(userId: string, file: File) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
 
   if (!supabase) {
-    throw new Error("Supabase credentials are required to upload resume files.");
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is required to upload resume files from the server.",
+    );
+  }
+
+  const { data: existingBucket, error: bucketError } = await supabase.storage.getBucket(
+    RESUME_ASSETS_BUCKET,
+  );
+
+  if (bucketError && !/bucket not found/i.test(bucketError.message)) {
+    throw new Error(bucketError.message);
+  }
+
+  if (!existingBucket) {
+    const { error: createBucketError } = await supabase.storage.createBucket(
+      RESUME_ASSETS_BUCKET,
+      {
+        public: false,
+        fileSizeLimit: "10MB",
+        allowedMimeTypes: [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "text/plain",
+          "text/markdown",
+        ],
+      },
+    );
+
+    if (createBucketError && !/already exists/i.test(createBucketError.message)) {
+      throw new Error(createBucketError.message);
+    }
   }
 
   const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
@@ -151,7 +183,7 @@ async function uploadResumeFile(userId: string, file: File) {
   const storagePath = `${userId}/${timestamp}-${sanitizedName}`;
 
   const { error } = await supabase.storage
-    .from("resume-assets")
+    .from(RESUME_ASSETS_BUCKET)
     .upload(storagePath, file, {
       contentType: file.type || "application/octet-stream",
       upsert: true,

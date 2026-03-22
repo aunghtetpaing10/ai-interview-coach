@@ -100,4 +100,24 @@ describe("submitOnboardingDraft", () => {
     expect(result.formValues.companyType).toBe("startup");
     expect(result.formValues.jobDescription).toBe("");
   });
+
+  it("returns a clear error when the persistence layer does not resolve in time", async () => {
+    vi.useFakeTimers();
+    saveOnboardingDraftForUserMock.mockImplementation(
+      () => new Promise(() => undefined),
+    );
+
+    const pendingResult = submitOnboardingDraft(
+      createInitialOnboardingState(),
+      createValidFormData(),
+    );
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    const result = await pendingResult;
+
+    expect(result.status).toBe("error");
+    expect(result.message).toMatch(/timed out/i);
+
+    vi.useRealTimers();
+  });
 });

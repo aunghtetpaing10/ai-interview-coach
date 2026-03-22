@@ -11,6 +11,27 @@ import {
   safeParseOnboardingDraftFromFormData,
 } from "@/lib/intake/validation";
 
+const ONBOARDING_SAVE_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(promise: Promise<T> | T, timeoutMs: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    Promise.resolve(promise).then(
+      (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
+
 export async function submitOnboardingDraft(
   previousState: OnboardingSubmissionState,
   formData: FormData,
@@ -34,12 +55,16 @@ export async function submitOnboardingDraft(
   try {
     const resumeFile = formData.get("resumeFile");
 
-    await saveOnboardingDraftForUser({
-      userId: user.id,
-      email: user.email,
-      draft,
-      file: resumeFile instanceof File && resumeFile.size > 0 ? resumeFile : null,
-    });
+    await withTimeout(
+      saveOnboardingDraftForUser({
+        userId: user.id,
+        email: user.email,
+        draft,
+        file: resumeFile instanceof File && resumeFile.size > 0 ? resumeFile : null,
+      }),
+      ONBOARDING_SAVE_TIMEOUT_MS,
+      "Saving the onboarding draft timed out. Check Postgres and Supabase Storage, then try again.",
+    );
   } catch (error) {
     return {
       status: "error",
