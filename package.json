@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint . --ignore-pattern coverage --ignore-pattern playwright-report --ignore-pattern test-results",
     "typecheck": "tsc --noEmit",
+    "pretest": "node -e \"require('fs').mkdirSync('coverage/.tmp', { recursive: true })\"",
     "test": "vitest run --coverage --config vitest.config.mjs",
     "test:watch": "vitest --config vitest.config.mjs",
     "test:e2e": "playwright test",

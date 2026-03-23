@@ -1,28 +1,73 @@
 import type { Metadata } from "next";
-import {
-  Cormorant_Garamond,
-  IBM_Plex_Mono,
-  Space_Grotesk,
-} from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { AppProviders } from "@/components/app-providers";
 
-const cormorantGaramond = Cormorant_Garamond({
+const cormorantGaramond = localFont({
   variable: "--font-cormorant-garamond",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  src: [
+    {
+      path: "./fonts/cormorant-garamond-regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/cormorant-garamond-italic.ttf",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "./fonts/cormorant-garamond-bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
 });
 
-const spaceGrotesk = Space_Grotesk({
+const spaceGrotesk = localFont({
   variable: "--font-space-grotesk",
-  subsets: ["latin"],
+  display: "swap",
+  src: [
+    {
+      path: "./fonts/space-grotesk-regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/space-grotesk-italic.ttf",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "./fonts/space-grotesk-bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
 });
 
-const ibmPlexMono = IBM_Plex_Mono({
+const ibmPlexMono = localFont({
   variable: "--font-ibm-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  display: "swap",
+  src: [
+    {
+      path: "./fonts/ibm-plex-mono-regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/ibm-plex-mono-bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "./fonts/ibm-plex-mono-600.ttf",
+      weight: "600",
+      style: "normal",
+    },
+  ],
 });
 
 export const metadata: Metadata = {
