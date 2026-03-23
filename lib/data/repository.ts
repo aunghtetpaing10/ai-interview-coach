@@ -9,6 +9,7 @@ import type {
   TargetRoleRow,
 } from "@/db/schema";
 import { INTERVIEW_SEED } from "@/db/seed";
+import { deriveActiveMode } from "@/lib/data/active-mode";
 
 export interface WorkspaceSnapshot {
   profile: ProfileRow | null;
@@ -75,7 +76,7 @@ export function createSeededInterviewRepository(
         targetRole: activeTargetRole,
         jobTarget: workspace.jobTarget ?? null,
         resumeAsset: workspace.resumeAsset ?? null,
-        activeMode: activeTargetRole ? "system-design" : "behavioral",
+        activeMode: deriveActiveMode(userSessions),
         questionCount: questions.length,
         rubricCount: rubrics.length,
         recentSessionCount: userSessions.length,
