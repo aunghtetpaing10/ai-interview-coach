@@ -108,4 +108,47 @@ describe("InterviewWorkspace", () => {
       expect(screen.getAllByText(/hardest bottlenecks and why/i)[0]).toBeInTheDocument(),
     );
   });
+
+  it("completes the session and opens the generated report", async () => {
+    const user = userEvent.setup();
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({}),
+      text: vi.fn(),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        reportId: "report-123",
+        status: "created",
+      }),
+      text: vi.fn(),
+    });
+
+    render(<InterviewWorkspace initialSession={createDemoInterviewSession()} />);
+
+    await user.click(screen.getAllByRole("button", { name: /^end$/i })[0]);
+
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/reports/report-123"),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/interview/sessions/interview-demo-session/complete",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/interview/sessions/interview-demo-session/report",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+    expect(
+      screen.getByText(/report ready\. opening the latest report\./i),
+    ).toBeInTheDocument();
+  });
 });

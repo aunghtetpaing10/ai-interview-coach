@@ -237,18 +237,18 @@ export function createPostgresReportStore(): ReportStore {
         throw new Error("Session not found while saving the generated report.");
       }
 
-      const existingRows = await db
-        .select()
-        .from(feedbackReports)
-        .where(eq(feedbackReports.sessionId, session.id))
-        .orderBy(desc(feedbackReports.createdAt))
-        .limit(1);
-      const existingReport = existingRows[0] ?? null;
+      const planSteps = report.practicePlan.steps.map((step) => ({
+        title: step.title,
+        description: `${step.drill} ${step.outcome}`.trim(),
+        length: `${step.minutes} min`,
+      }));
 
-      if (existingReport) {
-        await db
-          .update(feedbackReports)
-          .set({
+      await db.transaction(async (tx) => {
+        await tx
+          .insert(feedbackReports)
+          .values({
+            id: report.id,
+            sessionId: session.id,
             promptVersionId: context.promptVersion?.id ?? null,
             summary: report.summary.headline,
             scorecard: report.scorecard,
@@ -257,51 +257,36 @@ export function createPostgresReportStore(): ReportStore {
             citations: [...report.citations],
             rewrites: [...report.rewrites],
           })
-          .where(eq(feedbackReports.id, existingReport.id));
-      } else {
-        await db.insert(feedbackReports).values({
-          id: report.id,
-          sessionId: session.id,
-          promptVersionId: context.promptVersion?.id ?? null,
-          summary: report.summary.headline,
-          scorecard: report.scorecard,
-          strengths: [...report.strengths],
-          gaps: [...report.growthAreas],
-          citations: [...report.citations],
-          rewrites: [...report.rewrites],
-        });
-      }
+          .onConflictDoUpdate({
+            target: feedbackReports.sessionId,
+            set: {
+              promptVersionId: context.promptVersion?.id ?? null,
+              summary: report.summary.headline,
+              scorecard: report.scorecard,
+              strengths: [...report.strengths],
+              gaps: [...report.growthAreas],
+              citations: [...report.citations],
+              rewrites: [...report.rewrites],
+            },
+          });
 
-      const existingPracticePlanRows = await db
-        .select()
-        .from(practicePlans)
-        .where(eq(practicePlans.sessionId, session.id))
-        .orderBy(desc(practicePlans.createdAt))
-        .limit(1);
-      const existingPracticePlan = existingPracticePlanRows[0] ?? null;
-      const planSteps = report.practicePlan.steps.map((step) => ({
-        title: step.title,
-        description: `${step.drill} ${step.outcome}`.trim(),
-        length: `${step.minutes} min`,
-      }));
-
-      if (existingPracticePlan) {
-        await db
-          .update(practicePlans)
-          .set({
+        await tx
+          .insert(practicePlans)
+          .values({
+            sessionId: session.id,
             title: report.practicePlan.title,
             focus: report.practicePlan.focus,
             steps: planSteps,
           })
-          .where(eq(practicePlans.id, existingPracticePlan.id));
-      } else {
-        await db.insert(practicePlans).values({
-          sessionId: session.id,
-          title: report.practicePlan.title,
-          focus: report.practicePlan.focus,
-          steps: planSteps,
-        });
-      }
+          .onConflictDoUpdate({
+            target: practicePlans.sessionId,
+            set: {
+              title: report.practicePlan.title,
+              focus: report.practicePlan.focus,
+              steps: planSteps,
+            },
+          });
+      });
 
       return report;
     },

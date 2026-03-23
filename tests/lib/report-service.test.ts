@@ -227,14 +227,84 @@ describe("report service", () => {
     };
 
     const service = createReportService(store);
-    const report = await service.generateAndStoreReport("user_1", "session-123");
+    const result = await service.generateAndStoreReport("user_1", "session-123");
 
-    expect(report.id).toEqual(expect.any(String));
-    expect(report.title).toBe("Queue scaling drill");
-    expect(report.transcript).toHaveLength(2);
-    expect(report.citations.length).toBeGreaterThan(0);
-    expect(report.practicePlan.steps).toHaveLength(3);
+    expect(result.status).toBe("created");
+    expect(result.report.id).toEqual(expect.any(String));
+    expect(result.report.title).toBe("Queue scaling drill");
+    expect(result.report.transcript).toHaveLength(2);
+    expect(result.report.citations.length).toBeGreaterThan(0);
+    expect(result.report.practicePlan.steps).toHaveLength(3);
     expect(saved).toHaveLength(1);
     expect(store.loadGenerationContext).toHaveBeenCalledWith("user_1", "session-123");
+  });
+
+  it("returns an updated status and preserves the report id when regenerating", async () => {
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue({
+        session: {
+          id: "session-123",
+          userId: "user_1",
+          targetRoleId: "target-1",
+          mode: "project",
+          status: "completed",
+          title: "Queue scaling drill",
+          overallScore: 84,
+          durationSeconds: 18 * 60,
+          startedAt: new Date("2026-03-19T10:00:00.000Z"),
+          endedAt: new Date("2026-03-19T10:18:00.000Z"),
+          createdAt: new Date("2026-03-19T09:59:00.000Z"),
+          updatedAt: new Date("2026-03-19T10:18:00.000Z"),
+        },
+        profile: null,
+        targetRole: null,
+        jobTarget: null,
+        promptVersion: null,
+        transcript: [],
+        report: {
+          id: "report-existing",
+          sessionDate: "March 19, 2026",
+          title: "Queue scaling drill",
+          candidate: "Candidate",
+          targetRole: "Target role",
+          promptVersion: "Generated prompt",
+          scorecard: {
+            mode: "project",
+            overallScore: 84,
+            competencies: {
+              clarity: 84,
+              ownership: 78,
+              "technical-depth": 87,
+              communication: 80,
+              "systems-thinking": 75,
+            },
+          },
+          summary: scorecardSummary,
+          strengths: scorecardSummary.strengths,
+          growthAreas: scorecardSummary.growthAreas,
+          transcript: [],
+          citations: [],
+          rewrites: [],
+          practicePlan,
+        },
+        practicePlan: {
+          id: "plan-existing",
+          sessionId: "session-123",
+          title: "Platform engineer practice plan",
+          focus: scorecardSummary.headline,
+          steps: [],
+          createdAt: new Date("2026-03-19T10:18:00.000Z"),
+        },
+      }),
+      saveGeneratedReport: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const service = createReportService(store);
+    const result = await service.generateAndStoreReport("user_1", "session-123");
+
+    expect(result.status).toBe("updated");
+    expect(result.report.id).toBe("report-existing");
   });
 });
