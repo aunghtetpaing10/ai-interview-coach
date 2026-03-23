@@ -1,7 +1,6 @@
 import type {
   InterviewSessionRow,
   NewInterviewSessionRow,
-  NewTranscriptTurnRow,
   TranscriptSpeaker,
   TargetRoleRow,
   TranscriptTurnRow,
@@ -13,14 +12,8 @@ export interface InterviewSessionStore {
   createSession(row: NewInterviewSessionRow): Promise<InterviewSessionRow>;
   getSession(userId: string, sessionId: string): Promise<InterviewSessionRow | null>;
   listTranscriptTurns(sessionId: string): Promise<readonly TranscriptTurnRow[]>;
-  appendTranscriptTurns(
-    sessionId: string,
-    rows: readonly NewTranscriptTurnRow[],
-  ): Promise<readonly TranscriptTurnRow[]>;
-  updateSession(
-    sessionId: string,
-    patch: Partial<InterviewSessionRow>,
-  ): Promise<InterviewSessionRow>;
+  appendTranscriptTurns(input: AppendTranscriptTurnsInput): Promise<InterviewSessionRow>;
+  completeSession(input: CompleteInterviewSessionInput): Promise<InterviewSessionRow>;
 }
 
 export interface InterviewSessionView {
@@ -86,14 +79,6 @@ function toSessionView(
   };
 }
 
-function getNextSequenceIndex(turns: readonly TranscriptTurnRow[]) {
-  if (turns.length === 0) {
-    return 0;
-  }
-
-  return Math.max(...turns.map((turn) => turn.sequenceIndex)) + 1;
-}
-
 export function createInterviewSessionService(store: InterviewSessionStore) {
   return {
     async createSession(input: CreateInterviewSessionInput): Promise<InterviewSessionView> {
@@ -131,41 +116,8 @@ export function createInterviewSessionService(store: InterviewSessionStore) {
     async appendTranscriptTurns(
       input: AppendTranscriptTurnsInput,
     ): Promise<InterviewSessionView> {
-      const session = await store.getSession(input.userId, input.sessionId);
-
-      if (!session) {
-        throw new SessionServiceError("Session not found.", "not_found", 404);
-      }
-
-      if (session.status === "completed") {
-        throw new SessionServiceError(
-          "Completed sessions cannot accept new turns.",
-          "invalid_state",
-          409,
-        );
-      }
-
-      const existingTurns = await store.listTranscriptTurns(session.id);
-      const nextSequenceIndex = getNextSequenceIndex(existingTurns);
-      const createdAt = new Date();
-      const rows = input.turns.map((turn, index) => ({
-        sessionId: session.id,
-        speaker: turn.speaker,
-        body: turn.body.trim(),
-        seconds: turn.seconds,
-        sequenceIndex: nextSequenceIndex + index,
-        confidence: turn.confidence ?? 100,
-        createdAt,
-      }));
-
-      await store.appendTranscriptTurns(session.id, rows);
-
-      const updatedSession = await store.updateSession(session.id, {
-        status: "active",
-        startedAt: session.startedAt ?? createdAt,
-        updatedAt: createdAt,
-      });
-      const transcriptTurns = await store.listTranscriptTurns(session.id);
+      const updatedSession = await store.appendTranscriptTurns(input);
+      const transcriptTurns = await store.listTranscriptTurns(updatedSession.id);
 
       return toSessionView(updatedSession, transcriptTurns);
     },
@@ -173,25 +125,8 @@ export function createInterviewSessionService(store: InterviewSessionStore) {
     async completeSession(
       input: CompleteInterviewSessionInput,
     ): Promise<InterviewSessionView> {
-      const session = await store.getSession(input.userId, input.sessionId);
-
-      if (!session) {
-        throw new SessionServiceError("Session not found.", "not_found", 404);
-      }
-
-      if (session.status === "completed") {
-        const transcriptTurns = await store.listTranscriptTurns(session.id);
-        return toSessionView(session, transcriptTurns);
-      }
-
-      const endedAt = input.endedAt ?? new Date();
-      const updatedSession = await store.updateSession(session.id, {
-        status: "completed",
-        endedAt,
-        overallScore: input.overallScore ?? session.overallScore ?? null,
-        updatedAt: endedAt,
-      });
-      const transcriptTurns = await store.listTranscriptTurns(session.id);
+      const updatedSession = await store.completeSession(input);
+      const transcriptTurns = await store.listTranscriptTurns(updatedSession.id);
 
       return toSessionView(updatedSession, transcriptTurns);
     },
