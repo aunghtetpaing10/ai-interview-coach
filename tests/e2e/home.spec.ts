@@ -14,12 +14,9 @@ test("renders the landing page and links to the dashboard", async ({
   const dashboardLink = page.getByRole("link", { name: /open the dashboard/i });
   await expect(dashboardLink).toHaveAttribute("href", "/dashboard");
 
-  await page.goto("/dashboard");
+  await dashboardLink.click();
 
-  await expect(page).toHaveURL(/\/sign-in\?next=%2Fdashboard$/);
-  await expect(
-    page.getByRole("heading", {
-      name: /sign in to a workspace that keeps your interview prep tied to real evidence/i,
-    }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("heading", { name: /good evening,/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /view reports/i })).toBeVisible();
 });

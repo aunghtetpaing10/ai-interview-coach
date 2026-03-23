@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { getWorkspaceUser } from "@/lib/auth/session";
-import { createDatabaseInterviewSessionStore } from "@/lib/session-service/database-store";
 import {
   createInterviewSessionService,
   SessionServiceError,
 } from "@/lib/session-service/session-service";
 import { completeSessionRequestSchema } from "@/lib/session-service/validation";
+import { createWorkspaceInterviewSessionStore } from "@/lib/workspace/runtime";
 
 type RouteContext = {
   params: Promise<{
@@ -35,7 +35,7 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const service = createInterviewSessionService(createDatabaseInterviewSessionStore());
+  const service = createInterviewSessionService(await createWorkspaceInterviewSessionStore());
 
   try {
     const session = await service.completeSession({

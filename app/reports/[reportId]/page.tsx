@@ -9,8 +9,8 @@ import { CandidateShell } from "@/components/workspace/candidate-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { REPORT_EVAL_CASES, REPORT_PROMPT_FIXTURES } from "@/lib/evals/fixtures";
-import { createPostgresReportStore } from "@/lib/report-service/database-store";
 import { createReportService } from "@/lib/report-service/report-service";
+import { createWorkspaceReportStore } from "@/lib/workspace/runtime";
 
 export default async function Page({
   params,
@@ -19,7 +19,7 @@ export default async function Page({
 }) {
   const user = await requireWorkspaceUser("/reports");
   const { reportId } = await params;
-  const reportService = createReportService(createPostgresReportStore());
+  const reportService = createReportService(await createWorkspaceReportStore());
   const [report, reportOverviews] = await Promise.all([
     reportService.getReportById(user.id, reportId),
     reportService.listReportOverviews(user.id),

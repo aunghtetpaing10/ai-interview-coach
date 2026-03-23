@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { requireWorkspaceUser } from "@/lib/auth/session";
-import { createPostgresInterviewRepository } from "@/lib/data/database-repository";
 import { getInterviewModePreset } from "@/lib/interview-session/catalog";
 import { INTERVIEW_ROUTE_COPY } from "@/lib/interview-session/fixtures";
 import { buildInterviewSessionStateFromView } from "@/lib/interview-session/persisted";
 import { createRealtimeSessionSnapshot } from "@/lib/openai/realtime-session";
-import { createDatabaseInterviewSessionStore } from "@/lib/session-service/database-store";
 import { createInterviewSessionService } from "@/lib/session-service/session-service";
 import type { InterviewMode } from "@/lib/types/interview";
 import { InterviewWorkspace } from "@/components/interview/interview-workspace";
@@ -20,6 +18,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import {
+  createWorkspaceInterviewRepository,
+  createWorkspaceInterviewSessionStore,
+} from "@/lib/workspace/runtime";
 
 function parseRequestedMode(value: string | string[] | undefined): InterviewMode | null {
   if (typeof value !== "string") {
@@ -37,8 +39,10 @@ export default async function InterviewPage({
   searchParams?: Promise<{ mode?: string }>;
 }) {
   const user = await requireWorkspaceUser("/interview");
-  const repository = createPostgresInterviewRepository();
-  const sessionService = createInterviewSessionService(createDatabaseInterviewSessionStore());
+  const repository = await createWorkspaceInterviewRepository();
+  const sessionService = createInterviewSessionService(
+    await createWorkspaceInterviewSessionStore(),
+  );
   const workspace = await repository.getWorkspaceSnapshot(user.id);
   const candidateLabel = workspace.profile?.fullName ?? user.email ?? "Candidate";
   const shellHeadline =

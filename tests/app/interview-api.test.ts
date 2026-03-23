@@ -8,14 +8,14 @@ import type {
 import { SessionServiceError } from "@/lib/session-service/session-service";
 
 const getWorkspaceUserMock = vi.hoisted(() => vi.fn());
-const createDatabaseInterviewSessionStoreMock = vi.hoisted(() => vi.fn());
+const createWorkspaceInterviewSessionStoreMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth/session", () => ({
   getWorkspaceUser: getWorkspaceUserMock,
 }));
 
-vi.mock("@/lib/session-service/database-store", () => ({
-  createDatabaseInterviewSessionStore: createDatabaseInterviewSessionStoreMock,
+vi.mock("@/lib/workspace/runtime", () => ({
+  createWorkspaceInterviewSessionStore: createWorkspaceInterviewSessionStoreMock,
 }));
 
 import { GET as getSessionRoute } from "@/app/api/interview/sessions/[sessionId]/route";
@@ -23,10 +23,10 @@ import { POST as appendTurnsRoute } from "@/app/api/interview/sessions/[sessionI
 import { POST as completeSessionRoute } from "@/app/api/interview/sessions/[sessionId]/complete/route";
 import { POST as createSessionRoute } from "@/app/api/interview/sessions/route";
 
-function buildStore() {
+function buildStore(userId = "user-1") {
   const targetRole: TargetRoleRow = {
     id: "target-role-1",
-    userId: "user-1",
+    userId,
     title: "Platform engineer",
     companyType: "startup",
     level: "mid-level",
@@ -158,7 +158,7 @@ function buildStore() {
 describe("interview api routes", () => {
   beforeEach(() => {
     getWorkspaceUserMock.mockReset();
-    createDatabaseInterviewSessionStoreMock.mockReset();
+    createWorkspaceInterviewSessionStoreMock.mockReset();
   });
 
   it("rejects unauthenticated session creation", async () => {
@@ -185,7 +185,7 @@ describe("interview api routes", () => {
       email: "candidate@example.com",
       source: "supabase",
     });
-    createDatabaseInterviewSessionStoreMock.mockReturnValue(store);
+    createWorkspaceInterviewSessionStoreMock.mockReturnValue(store);
 
     const createResponse = await createSessionRoute(
       new Request("http://localhost/api/interview/sessions", {
@@ -266,7 +266,7 @@ describe("interview api routes", () => {
       email: "candidate@example.com",
       source: "supabase",
     });
-    createDatabaseInterviewSessionStoreMock.mockReturnValue({
+    createWorkspaceInterviewSessionStoreMock.mockReturnValue({
       getTargetRoleById: vi.fn(),
       createSession: vi.fn(),
       getSession: vi.fn(),
@@ -301,7 +301,7 @@ describe("interview api routes", () => {
       email: "candidate@example.com",
       source: "supabase",
     });
-    createDatabaseInterviewSessionStoreMock.mockReturnValue(buildStore().store);
+    createWorkspaceInterviewSessionStoreMock.mockReturnValue(buildStore().store);
 
     const response = await appendTurnsRoute(
       new Request(
@@ -338,7 +338,7 @@ describe("interview api routes", () => {
       email: "candidate@example.com",
       source: "supabase",
     });
-    createDatabaseInterviewSessionStoreMock.mockReturnValue(buildStore().store);
+    createWorkspaceInterviewSessionStoreMock.mockReturnValue(buildStore().store);
 
     const response = await completeSessionRoute(
       new Request(
@@ -360,5 +360,36 @@ describe("interview api routes", () => {
         overallScore: expect.any(Array),
       },
     });
+  });
+
+  it("creates a draft session for a demo workspace user", async () => {
+    const { store } = buildStore("demo-user");
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "demo-user",
+      email: "candidate@example.com",
+      source: "demo",
+    });
+    createWorkspaceInterviewSessionStoreMock.mockReturnValue(store);
+
+    const response = await createSessionRoute(
+      new Request("http://localhost/api/interview/sessions", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "system-design",
+          targetRoleId: "target-role-1",
+          title: "Platform interview",
+          durationSeconds: 1200,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          status: "draft",
+        }),
+      }),
+    );
   });
 });

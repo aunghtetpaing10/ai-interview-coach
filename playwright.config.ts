@@ -1,8 +1,17 @@
+import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+
+const demoRuntimeStatePath = join(
+  process.cwd(),
+  ".next",
+  "cache",
+  `playwright-demo-runtime-${Date.now()}.json`,
+);
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  fullyParallel: false,
+  workers: 1,
   reporter: "list",
   use: {
     baseURL: "http://127.0.0.1:3000",
@@ -15,8 +24,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
+    command: process.env.CI ? "npm run start" : "npm run dev",
     url: "http://127.0.0.1:3000",
     reuseExistingServer: !process.env.CI,
+    env: {
+      E2E_DEMO_MODE: "1",
+      E2E_DEMO_STATE_PATH: demoRuntimeStatePath,
+    },
   },
 });
