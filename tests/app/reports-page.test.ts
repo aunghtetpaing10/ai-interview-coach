@@ -4,12 +4,12 @@ import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
 
 const {
   requireWorkspaceUserMock,
-  createPostgresReportStoreMock,
+  createWorkspaceReportStoreMock,
   createReportServiceMock,
   redirectMock,
 } = vi.hoisted(() => ({
   requireWorkspaceUserMock: vi.fn(),
-  createPostgresReportStoreMock: vi.fn(),
+  createWorkspaceReportStoreMock: vi.fn(),
   createReportServiceMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`REDIRECT:${path}`);
@@ -26,8 +26,8 @@ vi.mock("@/lib/auth/session", () => ({
   requireWorkspaceUser: requireWorkspaceUserMock,
 }));
 
-vi.mock("@/lib/report-service/database-store", () => ({
-  createPostgresReportStore: createPostgresReportStoreMock,
+vi.mock("@/lib/workspace/runtime", () => ({
+  createWorkspaceReportStore: createWorkspaceReportStoreMock,
 }));
 
 vi.mock("@/lib/report-service/report-service", () => ({
@@ -114,12 +114,12 @@ describe("reports pages", () => {
   const user = {
     id: "user-1",
     email: "candidate@example.com",
-    source: "supabase" as const,
+    source: "demo" as const,
   };
 
   it("loads the latest report detail from the reports index route", async () => {
     requireWorkspaceUserMock.mockResolvedValue(user);
-    createPostgresReportStoreMock.mockReturnValue({});
+    createWorkspaceReportStoreMock.mockReturnValue({});
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([makeReportOverview()]),
     });
@@ -130,7 +130,7 @@ describe("reports pages", () => {
 
   it("renders a coherent empty state when there are no reports", async () => {
     requireWorkspaceUserMock.mockResolvedValue(user);
-    createPostgresReportStoreMock.mockReturnValue({});
+    createWorkspaceReportStoreMock.mockReturnValue({});
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([]),
       getReportById: vi.fn(),
@@ -145,7 +145,7 @@ describe("reports pages", () => {
 
   it("keeps report detail directly addressable", async () => {
     requireWorkspaceUserMock.mockResolvedValue(user);
-    createPostgresReportStoreMock.mockReturnValue({});
+    createWorkspaceReportStoreMock.mockReturnValue({});
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([makeReportOverview()]),
       getReportById: vi.fn().mockResolvedValue(makeReport()),

@@ -32,4 +32,9 @@ describe("parseEnv", () => {
     expect(env.NEXT_PUBLIC_SUPABASE_ANON_KEY).toBeUndefined();
     expect(env.OPENAI_API_KEY).toBeUndefined();
   });
+
+  it("parses demo mode as a boolean flag", () => {
+    expect(parseEnv({ E2E_DEMO_MODE: "1" }).E2E_DEMO_MODE).toBe(true);
+    expect(parseEnv({ E2E_DEMO_MODE: "0" }).E2E_DEMO_MODE).toBe(false);
+  });
 });

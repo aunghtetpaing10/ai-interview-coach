@@ -15,21 +15,35 @@ import {
 import { getAuthErrorMessage } from "@/lib/auth/messages";
 
 const createPostgresInterviewRepositoryMock = vi.hoisted(() => vi.fn());
+const getDemoWorkspaceUserMock = vi.hoisted(() => vi.fn());
+const isE2EDemoModeMock = vi.hoisted(() => vi.fn());
 
 vi.mock("server-only", () => ({}));
 
+vi.mock("@/lib/env", () => ({
+  isE2EDemoMode: isE2EDemoModeMock,
+}));
+
 vi.mock("@/lib/data/database-repository", () => ({
   createPostgresInterviewRepository: createPostgresInterviewRepositoryMock,
+}));
+
+vi.mock("@/lib/workspace/demo-runtime", () => ({
+  getDemoWorkspaceUser: getDemoWorkspaceUserMock,
 }));
 
 import {
   needsOnboarding,
   resolvePostAuthDestination,
 } from "@/lib/auth/destination";
+import { getWorkspaceUser, requireWorkspaceUser } from "@/lib/auth/session";
 
 describe("auth helpers", () => {
   beforeEach(() => {
     createPostgresInterviewRepositoryMock.mockReset();
+    getDemoWorkspaceUserMock.mockReset();
+    isE2EDemoModeMock.mockReset();
+    isE2EDemoModeMock.mockReturnValue(false);
   });
 
   it("sanitizes post-auth redirect targets", () => {
@@ -203,5 +217,26 @@ describe("auth helpers", () => {
     await expect(
       resolvePostAuthDestination("user-1", "https://evil.example.com/dashboard"),
     ).resolves.toBe("/dashboard");
+  });
+
+  it("uses the demo workspace user when demo mode is enabled", async () => {
+    isE2EDemoModeMock.mockReturnValue(true);
+    getDemoWorkspaceUserMock.mockReturnValue({
+      id: "demo-user",
+      email: "candidate@example.com",
+      source: "demo",
+    });
+
+    await expect(getWorkspaceUser()).resolves.toEqual({
+      id: "demo-user",
+      email: "candidate@example.com",
+      source: "demo",
+    });
+    await expect(requireWorkspaceUser("/workspace")).resolves.toEqual({
+      id: "demo-user",
+      email: "candidate@example.com",
+      source: "demo",
+    });
+    expect(createPostgresInterviewRepositoryMock).not.toHaveBeenCalled();
   });
 });

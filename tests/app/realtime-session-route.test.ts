@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   getEnvMock,
+  isE2EDemoModeMock,
   getWorkspaceUserMock,
   createRealtimeOpenAIClientMock,
   createRealtimeClientSecretMock,
 } = vi.hoisted(() => ({
   getEnvMock: vi.fn(),
+  isE2EDemoModeMock: vi.fn(),
   getWorkspaceUserMock: vi.fn(),
   createRealtimeOpenAIClientMock: vi.fn(),
   createRealtimeClientSecretMock: vi.fn(),
@@ -16,6 +18,7 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/env", () => ({
   getEnv: getEnvMock,
+  isE2EDemoMode: isE2EDemoModeMock,
 }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -47,9 +50,11 @@ function createRequest(body: Record<string, unknown>) {
 describe("POST /api/realtime/session", () => {
   beforeEach(() => {
     getEnvMock.mockReset();
+    isE2EDemoModeMock.mockReset();
     getWorkspaceUserMock.mockReset();
     createRealtimeOpenAIClientMock.mockReset();
     createRealtimeClientSecretMock.mockReset();
+    isE2EDemoModeMock.mockReturnValue(false);
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -103,6 +108,37 @@ describe("POST /api/realtime/session", () => {
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
         error: "OpenAI Realtime is not configured.",
+      }),
+    );
+    expect(createRealtimeClientSecretMock).not.toHaveBeenCalled();
+  });
+
+  it("short-circuits realtime setup in demo mode", async () => {
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "user-1",
+      email: "candidate@example.com",
+      source: "demo",
+    });
+    isE2EDemoModeMock.mockReturnValue(true);
+    getEnvMock.mockReturnValue({
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_REALTIME_MODEL: "gpt-realtime",
+    });
+
+    const response = await POST(
+      createRequest({
+        candidateName: "Aung",
+        targetRole: "Backend Software Engineer",
+        mode: "system-design",
+        focus: "systems",
+        openingPrompt: "Start here.",
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        error: "OpenAI Realtime is disabled in demo mode.",
       }),
     );
     expect(createRealtimeClientSecretMock).not.toHaveBeenCalled();

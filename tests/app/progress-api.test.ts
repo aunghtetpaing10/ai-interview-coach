@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildProgressDashboardSnapshot } from "@/lib/analytics/progress";
 
 const getWorkspaceUserMock = vi.hoisted(() => vi.fn());
-const createPostgresProgressStoreMock = vi.hoisted(() => vi.fn());
+const createWorkspaceProgressStoreMock = vi.hoisted(() => vi.fn());
 const createProgressServiceMock = vi.hoisted(() => vi.fn());
 
 vi.mock("server-only", () => ({}));
@@ -11,8 +11,8 @@ vi.mock("@/lib/auth/session", () => ({
   getWorkspaceUser: getWorkspaceUserMock,
 }));
 
-vi.mock("@/lib/progress-service/database-store", () => ({
-  createPostgresProgressStore: createPostgresProgressStoreMock,
+vi.mock("@/lib/workspace/runtime", () => ({
+  createWorkspaceProgressStore: createWorkspaceProgressStoreMock,
 }));
 
 vi.mock("@/lib/progress-service/progress-service", () => ({
@@ -24,7 +24,7 @@ import { GET as getProgressRoute } from "@/app/api/progress/route";
 describe("progress api route", () => {
   beforeEach(() => {
     getWorkspaceUserMock.mockReset();
-    createPostgresProgressStoreMock.mockReset();
+    createWorkspaceProgressStoreMock.mockReset();
     createProgressServiceMock.mockReset();
   });
 
@@ -40,7 +40,7 @@ describe("progress api route", () => {
     getWorkspaceUserMock.mockResolvedValue({
       id: "user_1",
       email: "candidate@example.com",
-      source: "supabase",
+      source: "demo",
     });
 
     const sessions = [

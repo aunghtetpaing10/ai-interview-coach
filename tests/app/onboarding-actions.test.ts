@@ -18,16 +18,9 @@ vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
 }));
 
-vi.mock("@/lib/intake/persistence", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/intake/persistence")>(
-    "@/lib/intake/persistence",
-  );
-
-  return {
-    ...actual,
-    saveOnboardingDraftForUser: saveOnboardingDraftForUserMock,
-  };
-});
+vi.mock("@/lib/workspace/runtime", () => ({
+  saveWorkspaceOnboardingDraftForUser: saveOnboardingDraftForUserMock,
+}));
 
 import { submitOnboardingDraft } from "@/app/onboarding/actions";
 import { createInitialOnboardingState } from "@/lib/intake/state";
@@ -60,7 +53,7 @@ describe("submitOnboardingDraft", () => {
     requireWorkspaceUserMock.mockResolvedValue({
       id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       email: "candidate@example.com",
-      source: "supabase",
+      source: "demo",
     } satisfies WorkspaceUser);
   });
 

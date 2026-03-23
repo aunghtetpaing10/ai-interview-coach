@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
 
 const getWorkspaceUserMock = vi.hoisted(() => vi.fn());
-const createPostgresReportStoreMock = vi.hoisted(() => vi.fn());
+const createWorkspaceReportStoreMock = vi.hoisted(() => vi.fn());
 const createReportServiceMock = vi.hoisted(() => vi.fn());
 
 vi.mock("server-only", () => ({}));
@@ -11,8 +11,8 @@ vi.mock("@/lib/auth/session", () => ({
   getWorkspaceUser: getWorkspaceUserMock,
 }));
 
-vi.mock("@/lib/report-service/database-store", () => ({
-  createPostgresReportStore: createPostgresReportStoreMock,
+vi.mock("@/lib/workspace/runtime", () => ({
+  createWorkspaceReportStore: createWorkspaceReportStoreMock,
 }));
 
 vi.mock("@/lib/report-service/report-service", () => ({
@@ -26,7 +26,7 @@ import { GET as listReportsRoute } from "@/app/api/reports/route";
 describe("report api routes", () => {
   beforeEach(() => {
     getWorkspaceUserMock.mockReset();
-    createPostgresReportStoreMock.mockReset();
+    createWorkspaceReportStoreMock.mockReset();
     createReportServiceMock.mockReset();
   });
 
@@ -90,7 +90,7 @@ describe("report api routes", () => {
     getWorkspaceUserMock.mockResolvedValue({
       id: "user_1",
       email: "candidate@example.com",
-      source: "supabase",
+      source: "demo",
     });
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([reportOverview]),
