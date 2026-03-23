@@ -13,6 +13,8 @@ export const metadata = {
     "Set up your target role, resume shell, and job description for grounded Curator interview coaching.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function OnboardingPage() {
   const user = await requireWorkspaceUser("/onboarding");
   const draft = await loadWorkspaceOnboardingDraftForUser(user.id);

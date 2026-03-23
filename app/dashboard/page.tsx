@@ -29,6 +29,8 @@ import {
   createWorkspaceReportStore,
 } from "@/lib/workspace/runtime";
 
+export const dynamic = "force-dynamic";
+
 const iconMap = {
   voice: AudioLines,
   report: FileText,

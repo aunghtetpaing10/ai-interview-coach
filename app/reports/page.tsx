@@ -16,6 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 import { createWorkspaceReportStore } from "@/lib/workspace/runtime";
 
+export const dynamic = "force-dynamic";
+
 export default async function ReportsPage() {
   const user = await requireWorkspaceUser("/reports");
   const reportService = createReportService(await createWorkspaceReportStore());

@@ -20,6 +20,8 @@ export const metadata: Metadata = {
     "Production-style progress dashboard for interview practice, telemetry health, and request budgeting.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ProgressPage() {
   const user = await requireWorkspaceUser("/progress");
   const progressService = createProgressService(await createWorkspaceProgressStore());
