@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getWorkspaceUser } from "@/lib/auth/session";
-import { getEnv } from "@/lib/env";
+import { getEnv, isE2EDemoMode } from "@/lib/env";
 import {
   createRealtimeOpenAIClient,
   createRealtimeClientSecret,
@@ -21,6 +21,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Authentication required." },
       { status: 401 },
+    );
+  }
+
+  if (isE2EDemoMode()) {
+    return NextResponse.json(
+      { error: "OpenAI Realtime is disabled in demo mode." },
+      { status: 503 },
     );
   }
 
