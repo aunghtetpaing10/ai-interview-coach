@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getWorkspaceUser } from "@/lib/auth/session";
-import { createDatabaseInterviewSessionStore } from "@/lib/session-service/database-store";
 import { createInterviewSessionService } from "@/lib/session-service/session-service";
 import { createInterviewSessionRequestSchema } from "@/lib/session-service/validation";
+import { createWorkspaceInterviewSessionStore } from "@/lib/workspace/runtime";
 
 export async function POST(request: Request) {
   const user = await getWorkspaceUser();
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const store = createDatabaseInterviewSessionStore();
+  const store = await createWorkspaceInterviewSessionStore();
   const targetRole = await store.getTargetRoleById(user.id, parsed.data.targetRoleId);
 
   if (!targetRole) {

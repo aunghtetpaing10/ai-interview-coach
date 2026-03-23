@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, FileText, Sparkles } from "lucide-react";
 import { requireWorkspaceUser } from "@/lib/auth/session";
-import { createPostgresReportStore } from "@/lib/report-service/database-store";
 import { createReportService } from "@/lib/report-service/report-service";
 import { CandidateShell } from "@/components/workspace/candidate-shell";
 import { Badge } from "@/components/ui/badge";
@@ -15,10 +14,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { createWorkspaceReportStore } from "@/lib/workspace/runtime";
 
 export default async function ReportsPage() {
   const user = await requireWorkspaceUser("/reports");
-  const reportService = createReportService(createPostgresReportStore());
+  const reportService = createReportService(await createWorkspaceReportStore());
   const reportOverviews = await reportService.listReportOverviews(user.id);
   const latestReport = reportOverviews[0];
   const userLabel = user.email ?? "Candidate";

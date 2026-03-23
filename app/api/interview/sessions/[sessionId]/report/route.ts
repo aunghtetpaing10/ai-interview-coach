@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getWorkspaceUser } from "@/lib/auth/session";
-import { createPostgresReportStore } from "@/lib/report-service/database-store";
 import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
+import { createWorkspaceReportStore } from "@/lib/workspace/runtime";
 
 type RouteContext = {
   params: Promise<{
@@ -17,7 +17,7 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   const { sessionId } = await context.params;
-  const reportService = createReportService(createPostgresReportStore());
+  const reportService = createReportService(await createWorkspaceReportStore());
 
   try {
     const result = await reportService.generateAndStoreReport(user.id, sessionId);

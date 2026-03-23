@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireWorkspaceUser } from "@/lib/auth/session";
 import type { OnboardingSubmissionState } from "@/lib/intake/types";
-import { makeOnboardingStateMessage, saveOnboardingDraftForUser } from "@/lib/intake/persistence";
+import { makeOnboardingStateMessage } from "@/lib/intake/persistence";
 import { buildOnboardingFormValues } from "@/lib/intake/state";
 import { buildOnboardingSummary } from "@/lib/intake/summary";
 import {
   readOnboardingFormValues,
   safeParseOnboardingDraftFromFormData,
 } from "@/lib/intake/validation";
+import { saveWorkspaceOnboardingDraftForUser } from "@/lib/workspace/runtime";
 
 const ONBOARDING_SAVE_TIMEOUT_MS = 15_000;
 
@@ -56,7 +57,7 @@ export async function submitOnboardingDraft(
     const resumeFile = formData.get("resumeFile");
 
     await withTimeout(
-      saveOnboardingDraftForUser({
+      saveWorkspaceOnboardingDraftForUser({
         userId: user.id,
         email: user.email,
         draft,

@@ -9,10 +9,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPostHogTelemetryStatus } from "@/lib/analytics/posthog";
 import { getSentryTelemetryStatus } from "@/lib/observability/sentry";
-import { createPostgresProgressStore } from "@/lib/progress-service/database-store";
 import { createProgressService } from "@/lib/progress-service/progress-service";
 import { getRateLimitTelemetryStatus } from "@/lib/rate-limit/upstash";
 import { cn } from "@/lib/utils";
+import { createWorkspaceProgressStore } from "@/lib/workspace/runtime";
 
 export const metadata: Metadata = {
   title: "Progress",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 
 export default async function ProgressPage() {
   const user = await requireWorkspaceUser("/progress");
-  const progressService = createProgressService(createPostgresProgressStore());
+  const progressService = createProgressService(await createWorkspaceProgressStore());
   const [sessions, snapshot] = await Promise.all([
     progressService.listProgressSessions(user.id),
     progressService.getProgressSnapshot(user.id),

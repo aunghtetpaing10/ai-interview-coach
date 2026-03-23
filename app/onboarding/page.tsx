@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { OnboardingFlow } from "@/components/intake/onboarding-flow";
 import { createInitialOnboardingState } from "@/lib/intake/state";
-import { loadOnboardingDraftForUser } from "@/lib/intake/persistence";
+import { loadWorkspaceOnboardingDraftForUser } from "@/lib/workspace/runtime";
 
 export const metadata = {
   title: "Onboarding",
@@ -15,7 +15,7 @@ export const metadata = {
 
 export default async function OnboardingPage() {
   const user = await requireWorkspaceUser("/onboarding");
-  const draft = await loadOnboardingDraftForUser(user.id);
+  const draft = await loadWorkspaceOnboardingDraftForUser(user.id);
   const initialState = createInitialOnboardingState(draft);
 
   return (

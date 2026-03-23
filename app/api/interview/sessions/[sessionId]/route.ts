@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getWorkspaceUser } from "@/lib/auth/session";
-import { createDatabaseInterviewSessionStore } from "@/lib/session-service/database-store";
 import { createInterviewSessionService } from "@/lib/session-service/session-service";
+import { createWorkspaceInterviewSessionStore } from "@/lib/workspace/runtime";
 
 type RouteContext = {
   params: Promise<{
@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const { sessionId } = await context.params;
-  const service = createInterviewSessionService(createDatabaseInterviewSessionStore());
+  const service = createInterviewSessionService(await createWorkspaceInterviewSessionStore());
   const session = await service.getSession({ userId: user.id, sessionId });
 
   if (!session) {

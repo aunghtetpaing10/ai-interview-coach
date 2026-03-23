@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getWorkspaceUser } from "@/lib/auth/session";
-import { createPostgresReportStore } from "@/lib/report-service/database-store";
 import { createReportService } from "@/lib/report-service/report-service";
+import { createWorkspaceReportStore } from "@/lib/workspace/runtime";
 
 export async function GET(
   _request: Request,
@@ -14,7 +14,7 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const reportService = createReportService(createPostgresReportStore());
+  const reportService = createReportService(await createWorkspaceReportStore());
   const report = await reportService.getReportById(user.id, id);
 
   if (!report) {

@@ -7,11 +7,8 @@ import {
   Target,
 } from "lucide-react";
 import { requireWorkspaceUser } from "@/lib/auth/session";
-import { createPostgresInterviewRepository } from "@/lib/data/database-repository";
 import { buildDashboardReadModel } from "@/lib/dashboard/read-model";
-import { createPostgresProgressStore } from "@/lib/progress-service/database-store";
 import { createProgressService } from "@/lib/progress-service/progress-service";
-import { createPostgresReportStore } from "@/lib/report-service/database-store";
 import { createReportService } from "@/lib/report-service/report-service";
 import { CandidateShell } from "@/components/workspace/candidate-shell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,6 +23,11 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import {
+  createWorkspaceInterviewRepository,
+  createWorkspaceProgressStore,
+  createWorkspaceReportStore,
+} from "@/lib/workspace/runtime";
 
 const iconMap = {
   voice: AudioLines,
@@ -45,9 +47,9 @@ function getInitials(name: string) {
 
 export default async function DashboardPage() {
   const user = await requireWorkspaceUser("/dashboard");
-  const repository = createPostgresInterviewRepository();
-  const reportService = createReportService(createPostgresReportStore());
-  const progressService = createProgressService(createPostgresProgressStore());
+  const repository = await createWorkspaceInterviewRepository();
+  const reportService = createReportService(await createWorkspaceReportStore());
+  const progressService = createProgressService(await createWorkspaceProgressStore());
 
   const [workspace, sessions, reportOverviews, progressSnapshot] = await Promise.all([
     repository.getWorkspaceSnapshot(user.id),
