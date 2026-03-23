@@ -148,6 +148,65 @@ describe("database interview repository", () => {
     expect(snapshot.resumeAsset?.fileName).toBe("resume.pdf");
   });
 
+  it("derives the active mode from the most recent non-archived session", async () => {
+    const repository = createDatabaseInterviewRepository({
+      async getProfile() {
+        return null;
+      },
+      async listTargetRoles() {
+        return [];
+      },
+      async listSessions() {
+        return [
+          {
+            id: "session-1",
+            userId: "user-1",
+            targetRoleId: "target-role-1",
+            mode: "resume",
+            status: "archived",
+            title: "Archived drill",
+            overallScore: 72,
+            durationSeconds: 900,
+            startedAt: null,
+            endedAt: null,
+            createdAt: new Date("2026-03-18T09:00:00.000Z"),
+            updatedAt: new Date("2026-03-18T09:30:00.000Z"),
+          },
+          {
+            id: "session-2",
+            userId: "user-1",
+            targetRoleId: "target-role-1",
+            mode: "project",
+            status: "completed",
+            title: "Latest drill",
+            overallScore: 81,
+            durationSeconds: 1200,
+            startedAt: null,
+            endedAt: null,
+            createdAt: new Date("2026-03-18T10:00:00.000Z"),
+            updatedAt: new Date("2026-03-18T10:20:00.000Z"),
+          },
+        ];
+      },
+      async listQuestionBank() {
+        return [];
+      },
+      async listRubricDimensions() {
+        return [];
+      },
+      async getLatestResumeAsset() {
+        return null;
+      },
+      async getActiveJobTarget() {
+        return null;
+      },
+    });
+
+    const snapshot = await repository.getWorkspaceSnapshot("user-1");
+
+    expect(snapshot.activeMode).toBe("project");
+  });
+
   it("filters the question bank by interview mode", async () => {
     const repository = makeRepositoryFixture();
     const questions = await repository.listQuestionBank("behavioral");

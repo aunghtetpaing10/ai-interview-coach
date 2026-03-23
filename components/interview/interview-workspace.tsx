@@ -204,18 +204,24 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
       }
 
       const reportResponse = await fetch(
-        `/api/reports/${state.sessionId}/generate`,
+        `/api/interview/sessions/${state.sessionId}/report`,
         {
           method: "POST",
         },
       );
 
       if (!reportResponse.ok) {
-        throw new Error("Session saved, but report generation could not be queued.");
+        throw new Error("Session saved, but the report could not be created.");
       }
 
-      setRuntimeNotice("Session saved. Report generation queued.");
-      router.push("/reports");
+      const reportResult = await reportResponse.json().catch(() => null);
+
+      if (!reportResult?.reportId) {
+        throw new Error("Session saved, but the report response was invalid.");
+      }
+
+      setRuntimeNotice("Report ready. Opening the latest report.");
+      router.push(`/reports/${reportResult.reportId}`);
     } catch (error) {
       setRuntimeNotice(
         error instanceof Error

@@ -30,6 +30,13 @@ type SaveOnboardingDraftInput = {
 };
 
 const RESUME_ASSETS_BUCKET = "resume-assets";
+type DbMutationClient = Pick<ReturnType<typeof getDb>, "select" | "insert" | "update">;
+
+type UploadedResumeFile = {
+  fileName: string;
+  storagePath: string;
+  mimeType: string;
+};
 
 function titleCaseWord(value: string) {
   if (!value) {
@@ -141,7 +148,7 @@ export async function loadOnboardingDraftForUser(userId: string) {
   return hydrateOnboardingDraftFromWorkspaceSnapshot(snapshot);
 }
 
-async function uploadResumeFile(userId: string, file: File) {
+async function uploadResumeFile(userId: string, file: File): Promise<UploadedResumeFile> {
   const supabase = createSupabaseAdminClient();
 
   if (!supabase) {
@@ -201,11 +208,12 @@ async function uploadResumeFile(userId: string, file: File) {
 }
 
 async function saveProfile(
+  db: DbMutationClient,
   userId: string,
   email: string | null,
   draft: OnboardingDraft,
+  now: Date,
 ): Promise<ProfileRow> {
-  const db = getDb();
   const [profile] = await db
     .insert(profiles)
     .values({
@@ -213,7 +221,7 @@ async function saveProfile(
       fullName: deriveFullName(email),
       headline: `${draft.seniority} ${draft.roleTitle}`.trim(),
       targetRole: draft.roleTitle,
-      updatedAt: new Date(),
+      updatedAt: now,
     })
     .onConflictDoUpdate({
       target: profiles.userId,
@@ -221,7 +229,7 @@ async function saveProfile(
         fullName: deriveFullName(email),
         headline: `${draft.seniority} ${draft.roleTitle}`.trim(),
         targetRole: draft.roleTitle,
-        updatedAt: new Date(),
+        updatedAt: now,
       },
     })
     .returning();
@@ -230,10 +238,10 @@ async function saveProfile(
 }
 
 async function saveActiveTargetRole(
+  db: DbMutationClient,
   userId: string,
   draft: OnboardingDraft,
 ): Promise<TargetRoleRow> {
-  const db = getDb();
   const [activeRole] = await db
     .select()
     .from(targetRoles)
@@ -272,15 +280,16 @@ async function saveActiveTargetRole(
 }
 
 async function saveJobTarget(
+  db: DbMutationClient,
   userId: string,
   targetRoleId: string,
   draft: OnboardingDraft,
+  now: Date,
 ): Promise<JobTargetRow> {
-  const db = getDb();
   const [existingJobTarget] = await db
     .select()
     .from(jobTargets)
-    .where(eq(jobTargets.targetRoleId, targetRoleId))
+    .where(and(eq(jobTargets.userId, userId), eq(jobTargets.targetRoleId, targetRoleId)))
     .limit(1);
 
   if (existingJobTarget) {
@@ -291,7 +300,7 @@ async function saveJobTarget(
         jobTitle: draft.jobTitle,
         jobUrl: draft.jobUrl,
         jobDescription: draft.jobDescription,
-        updatedAt: new Date(),
+        updatedAt: now,
       })
       .where(eq(jobTargets.id, existingJobTarget.id))
       .returning();
@@ -315,16 +324,16 @@ async function saveJobTarget(
 }
 
 async function saveResumeAsset(
+  db: DbMutationClient,
   userId: string,
   draft: OnboardingDraft,
   file: File | null,
+  uploadedFile: UploadedResumeFile | null,
 ): Promise<ResumeAssetRow | null> {
   if (draft.resumePreview.source === "none") {
     return null;
   }
 
-  const db = getDb();
-  const uploadedFile = file && file.size > 0 ? await uploadResumeFile(userId, file) : null;
   const storagePath =
     uploadedFile?.storagePath ??
     `inline/${userId}/${Date.now()}-${draft.resumePreview.fileName.replace(/[^a-zA-Z0-9._-]+/g, "-")}`;
@@ -343,16 +352,47 @@ async function saveResumeAsset(
   return resumeAsset;
 }
 
-export async function saveOnboardingDraftForUser(input: SaveOnboardingDraftInput) {
-  const profile = await saveProfile(input.userId, input.email, input.draft);
-  const targetRole = await saveActiveTargetRole(input.userId, input.draft);
-  const jobTarget = await saveJobTarget(input.userId, targetRole.id, input.draft);
-  const resumeAsset = await saveResumeAsset(input.userId, input.draft, input.file);
+async function deleteUploadedResumeFile(storagePath: string) {
+  const supabase = createSupabaseAdminClient();
 
-  return {
-    profile,
-    targetRole,
-    jobTarget,
-    resumeAsset,
-  };
+  if (!supabase) {
+    return;
+  }
+
+  await supabase.storage.from(RESUME_ASSETS_BUCKET).remove([storagePath]);
+}
+
+export async function saveOnboardingDraftForUser(input: SaveOnboardingDraftInput) {
+  const db = getDb();
+  const file = input.file && input.file.size > 0 ? input.file : null;
+  const uploadedFile = file ? await uploadResumeFile(input.userId, file) : null;
+  const now = new Date();
+
+  try {
+    return await db.transaction(async (tx) => {
+      const profile = await saveProfile(tx, input.userId, input.email, input.draft, now);
+      const targetRole = await saveActiveTargetRole(tx, input.userId, input.draft);
+      const jobTarget = await saveJobTarget(tx, input.userId, targetRole.id, input.draft, now);
+      const resumeAsset = await saveResumeAsset(
+        tx,
+        input.userId,
+        input.draft,
+        file,
+        uploadedFile,
+      );
+
+      return {
+        profile,
+        targetRole,
+        jobTarget,
+        resumeAsset,
+      };
+    });
+  } catch (error) {
+    if (uploadedFile) {
+      await deleteUploadedResumeFile(uploadedFile.storagePath);
+    }
+
+    throw error;
+  }
 }

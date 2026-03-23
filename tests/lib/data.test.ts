@@ -61,6 +61,7 @@ describe("seeded interview repository", () => {
     expect(snapshot.questionCount).toBe(SEED_QUESTION_BANK.length);
     expect(snapshot.rubricCount).toBe(SEED_RUBRIC_DIMENSIONS.length);
     expect(snapshot.recentSessionCount).toBe(1);
+    expect(snapshot.activeMode).toBe("system-design");
     expect(metrics[0]?.value).toBe("Platform engineer");
     expect(metrics[2]?.value).toBe(`${SEED_RUBRIC_DIMENSIONS.length} criteria`);
   });

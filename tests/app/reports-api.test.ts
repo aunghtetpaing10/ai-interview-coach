@@ -4,7 +4,6 @@ import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
 const getWorkspaceUserMock = vi.hoisted(() => vi.fn());
 const createPostgresReportStoreMock = vi.hoisted(() => vi.fn());
 const createReportServiceMock = vi.hoisted(() => vi.fn());
-const createReportGenerationQueueMock = vi.hoisted(() => vi.fn());
 
 vi.mock("server-only", () => ({}));
 
@@ -20,12 +19,8 @@ vi.mock("@/lib/report-service/report-service", () => ({
   createReportService: createReportServiceMock,
 }));
 
-vi.mock("@/lib/inngest/report-generation", () => ({
-  createReportGenerationQueue: createReportGenerationQueueMock,
-}));
-
 import { GET as getReportRoute } from "@/app/api/reports/[id]/route";
-import { POST as generateReportRoute } from "@/app/api/reports/[id]/generate/route";
+import { POST as createReportRoute } from "@/app/api/interview/sessions/[sessionId]/report/route";
 import { GET as listReportsRoute } from "@/app/api/reports/route";
 
 describe("report api routes", () => {
@@ -33,7 +28,6 @@ describe("report api routes", () => {
     getWorkspaceUserMock.mockReset();
     createPostgresReportStoreMock.mockReset();
     createReportServiceMock.mockReset();
-    createReportGenerationQueueMock.mockReset();
   });
 
   const reportOverview: ReportOverview = {
@@ -153,7 +147,7 @@ describe("report api routes", () => {
     expect(response.status).toBe(404);
   });
 
-  it("queues report generation after session completion", async () => {
+  it("creates or updates a report for a completed session", async () => {
     getWorkspaceUserMock.mockResolvedValue({
       id: "user_1",
       email: "candidate@example.com",
@@ -162,23 +156,20 @@ describe("report api routes", () => {
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn(),
       getReportById: vi.fn(),
-      generateAndStoreReport: vi.fn(),
-    });
-    createReportGenerationQueueMock.mockReturnValue({
-      enqueueReportGeneration: vi.fn().mockResolvedValue({
-        queued: true,
-        sessionId: "session-1",
+      generateAndStoreReport: vi.fn().mockResolvedValue({
+        report: reportDetail,
+        status: "created",
       }),
     });
 
-    const response = await generateReportRoute(undefined as never, {
-      params: Promise.resolve({ id: "session-1" }),
+    const response = await createReportRoute(undefined as never, {
+      params: Promise.resolve({ sessionId: "session-1" }),
     });
 
-    expect(response.status).toBe(202);
+    expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      queued: true,
-      sessionId: "session-1",
+      reportId: "report-1",
+      status: "created",
     });
   });
 });

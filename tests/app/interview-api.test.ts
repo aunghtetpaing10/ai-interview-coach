@@ -5,6 +5,7 @@ import type {
   TargetRoleRow,
   TranscriptTurnRow,
 } from "@/db/schema";
+import { SessionServiceError } from "@/lib/session-service/session-service";
 
 const getWorkspaceUserMock = vi.hoisted(() => vi.fn());
 const createDatabaseInterviewSessionStoreMock = vi.hoisted(() => vi.fn());
@@ -73,29 +74,80 @@ function buildStore() {
     async listTranscriptTurns(sessionId: string) {
       return [...(turns.get(sessionId) ?? [])];
     },
-    async appendTranscriptTurns(sessionId: string, rows: readonly { speaker: TranscriptTurnRow["speaker"]; body: string; seconds: number; confidence?: number; sequenceIndex?: number; }[]) {
-      const current = turns.get(sessionId) ?? [];
-      const appended = rows.map((row, index) => ({
+    async appendTranscriptTurns(input: {
+      userId: string;
+      sessionId: string;
+      turns: readonly {
+        speaker: TranscriptTurnRow["speaker"];
+        body: string;
+        seconds: number;
+        confidence?: number;
+      }[];
+    }) {
+      const session = sessions.get(input.sessionId);
+
+      if (!session || session.userId !== input.userId) {
+        throw new SessionServiceError("Session not found.", "not_found", 404);
+      }
+
+      if (session.status === "completed") {
+        throw new SessionServiceError(
+          "Completed sessions cannot accept new turns.",
+          "invalid_state",
+          409,
+        );
+      }
+
+      const current = turns.get(input.sessionId) ?? [];
+      const createdAt = new Date("2026-03-19T00:00:00.000Z");
+      const appended = input.turns.map((row, index) => ({
         id: `turn-${current.length + index + 1}`,
-        sessionId,
+        sessionId: input.sessionId,
         speaker: row.speaker,
         body: row.body,
         seconds: row.seconds,
-        sequenceIndex: row.sequenceIndex ?? current.length + index,
+        sequenceIndex: current.length + index,
         confidence: row.confidence ?? 100,
-        createdAt: new Date("2026-03-19T00:00:00.000Z"),
+        createdAt,
       }));
-      turns.set(sessionId, [...current, ...appended]);
-      return appended;
+
+      turns.set(input.sessionId, [...current, ...appended]);
+
+      const updated = {
+        ...session,
+        status: "active" as const,
+        startedAt: session.startedAt ?? createdAt,
+        updatedAt: createdAt,
+      };
+      sessions.set(input.sessionId, updated);
+
+      return updated;
     },
-    async updateSession(sessionId: string, patch: Partial<InterviewSessionRow>) {
-      const session = sessions.get(sessionId);
-      if (!session) {
-        throw new Error("missing session");
+    async completeSession(input: {
+      userId: string;
+      sessionId: string;
+      overallScore?: number;
+      endedAt?: Date;
+    }) {
+      const session = sessions.get(input.sessionId);
+      if (!session || session.userId !== input.userId) {
+        throw new SessionServiceError("Session not found.", "not_found", 404);
       }
 
-      const updated = { ...session, ...patch } as InterviewSessionRow;
-      sessions.set(sessionId, updated);
+      if (session.status === "completed") {
+        return session;
+      }
+
+      const endedAt = input.endedAt ?? new Date("2026-03-19T00:18:00.000Z");
+      const updated = {
+        ...session,
+        status: "completed" as const,
+        endedAt,
+        overallScore: input.overallScore ?? session.overallScore ?? null,
+        updatedAt: endedAt,
+      } satisfies InterviewSessionRow;
+
+      sessions.set(input.sessionId, updated);
       return updated;
     },
   };
@@ -206,5 +258,107 @@ describe("interview api routes", () => {
     const completed = await completeResponse.json();
     expect(completed.session.status).toBe("completed");
     expect(completed.session.overallScore).toBe(86);
+  });
+
+  it("rejects invalid session creation payloads with field errors", async () => {
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "user-1",
+      email: "candidate@example.com",
+      source: "supabase",
+    });
+    createDatabaseInterviewSessionStoreMock.mockReturnValue({
+      getTargetRoleById: vi.fn(),
+      createSession: vi.fn(),
+      getSession: vi.fn(),
+      listTranscriptTurns: vi.fn(),
+      appendTranscriptTurns: vi.fn(),
+      completeSession: vi.fn(),
+    });
+
+    const response = await createSessionRoute(
+      new Request("http://localhost/api/interview/sessions", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "invalid-mode",
+          targetRoleId: "target-role-1",
+          title: "Platform interview",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Invalid session request.",
+      fieldErrors: {
+        mode: expect.any(Array),
+      },
+    });
+  });
+
+  it("rejects invalid turn payloads with field errors", async () => {
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "user-1",
+      email: "candidate@example.com",
+      source: "supabase",
+    });
+    createDatabaseInterviewSessionStoreMock.mockReturnValue(buildStore().store);
+
+    const response = await appendTurnsRoute(
+      new Request(
+        "http://localhost/api/interview/sessions/session-1/turns",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            turns: [
+              {
+                speaker: "candidate",
+                body: "Too short",
+                seconds: -1,
+                confidence: 110,
+              },
+            ],
+          }),
+        },
+      ),
+      { params: Promise.resolve({ sessionId: "session-1" }) },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Invalid transcript turns.",
+      fieldErrors: {
+        turns: expect.any(Array),
+      },
+    });
+  });
+
+  it("rejects invalid completion payloads with field errors", async () => {
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "user-1",
+      email: "candidate@example.com",
+      source: "supabase",
+    });
+    createDatabaseInterviewSessionStoreMock.mockReturnValue(buildStore().store);
+
+    const response = await completeSessionRoute(
+      new Request(
+        "http://localhost/api/interview/sessions/session-1/complete",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            overallScore: 101,
+          }),
+        },
+      ),
+      { params: Promise.resolve({ sessionId: "session-1" }) },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Invalid completion request.",
+      fieldErrors: {
+        overallScore: expect.any(Array),
+      },
+    });
   });
 });

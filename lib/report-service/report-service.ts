@@ -54,6 +54,13 @@ export interface ReportStore {
 
 export type ReportServiceErrorCode = "not_found" | "invalid_state";
 
+export type GeneratedReportStatus = "created" | "updated";
+
+export interface GeneratedReportResult {
+  report: InterviewReport;
+  status: GeneratedReportStatus;
+}
+
 export class ReportServiceError extends Error {
   constructor(
     message: string,
@@ -235,7 +242,7 @@ export function createReportService(store: ReportStore) {
     async generateAndStoreReport(
       userId: string,
       sessionId: string,
-    ): Promise<InterviewReport> {
+    ): Promise<GeneratedReportResult> {
       const context = await store.loadGenerationContext(userId, sessionId);
 
       if (!context) {
@@ -251,7 +258,12 @@ export function createReportService(store: ReportStore) {
       }
 
       const report = buildGeneratedReport(context);
-      return store.saveGeneratedReport(userId, context, report);
+      await store.saveGeneratedReport(userId, context, report);
+
+      return {
+        report,
+        status: context.report ? "updated" : "created",
+      };
     },
   };
 }

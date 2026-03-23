@@ -15,6 +15,13 @@
       "when": 1773934335740,
       "tag": "0001_plain_the_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774252033492,
+      "tag": "0002_spotty_mongoose",
+      "breakpoints": true
     }
   ]
 }

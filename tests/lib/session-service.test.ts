@@ -7,6 +7,7 @@ import type {
 } from "@/db/schema";
 import {
   createInterviewSessionService,
+  SessionServiceError,
   type InterviewSessionStore,
 } from "@/lib/session-service/session-service";
 
@@ -63,34 +64,69 @@ function buildStore() {
     async listTranscriptTurns(sessionId) {
       return [...(turns.get(sessionId) ?? [])];
     },
-    async appendTranscriptTurns(sessionId, rows) {
-      const current = turns.get(sessionId) ?? [];
-      const appended = rows.map((row, index) => ({
+    async appendTranscriptTurns(input) {
+      const session = sessions.get(input.sessionId);
+      if (!session || session.userId !== input.userId) {
+        throw new SessionServiceError("Session not found.", "not_found", 404);
+      }
+
+      if (session.status === "completed") {
+        throw new SessionServiceError(
+          "Completed sessions cannot accept new turns.",
+          "invalid_state",
+          409,
+        );
+      }
+
+      const current = turns.get(input.sessionId) ?? [];
+      const createdAt = new Date("2026-03-19T00:00:00.000Z");
+      const appended = input.turns.map((row, index) => ({
         id: `turn-${current.length + index + 1}`,
-        sessionId,
+        sessionId: input.sessionId,
         speaker: row.speaker,
         body: row.body,
         seconds: row.seconds,
-        sequenceIndex: row.sequenceIndex ?? current.length + index,
+        sequenceIndex: current.length + index,
         confidence: row.confidence ?? 100,
-        createdAt: row.createdAt ?? new Date("2026-03-19T00:00:00.000Z"),
+        createdAt,
       }));
 
-      turns.set(sessionId, [...current, ...appended]);
-      return appended;
-    },
-    async updateSession(sessionId, patch) {
-      const session = sessions.get(sessionId);
-      if (!session) {
-        throw new Error("missing session");
-      }
+      turns.set(input.sessionId, [...current, ...appended]);
 
       const updated = {
         ...session,
-        ...patch,
+        status: "active" as const,
+        startedAt: session.startedAt ?? createdAt,
+        updatedAt: createdAt,
+      };
+      sessions.set(input.sessionId, updated);
+
+      return updated;
+    },
+    async completeSession(input) {
+      const session = sessions.get(input.sessionId);
+      if (!session) {
+        throw new SessionServiceError("Session not found.", "not_found", 404);
+      }
+
+      if (session.userId !== input.userId) {
+        throw new SessionServiceError("Session not found.", "not_found", 404);
+      }
+
+      if (session.status === "completed") {
+        return session;
+      }
+
+      const endedAt = input.endedAt ?? new Date("2026-03-19T00:18:00.000Z");
+      const updated = {
+        ...session,
+        status: "completed" as const,
+        endedAt,
+        overallScore: input.overallScore ?? session.overallScore ?? null,
+        updatedAt: endedAt,
       } satisfies InterviewSessionRow;
 
-      sessions.set(sessionId, updated);
+      sessions.set(input.sessionId, updated);
       return updated;
     },
   };

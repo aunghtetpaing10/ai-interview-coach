@@ -44,6 +44,21 @@ conventions, or file structure.
 ## Workflow Expectations
 
 - Keep `main` green. Use short-lived branches and PRs for changes.
+- Before making code changes, create and switch to a new short-lived branch for
+  the feature or cohesive task unless the user explicitly asks to stay on the
+  current branch.
+- Default branch naming should stay descriptive and scoped:
+  `codex/<task-scope>` for the main worker and
+  `codex/<task-scope>-<responsibility>` for delegated or parallel agent work.
+- When multiple agents work in parallel, each agent must use its own branch and
+  own a clearly scoped responsibility or file set. Do not mix multiple agents'
+  feature work on the same branch.
+- Make a clean git commit for each completed feature or related task once the
+  relevant checks for that scope pass. Keep commits focused and do not mix
+  unrelated changes in the same commit.
+- If the worktree already contains unrelated user changes, do not include them
+  in the branch commit. Work around them or ask before proceeding if isolation
+  is not possible.
 - Prefer tests-first changes for reducers, parsers, validation, and server helpers.
 - Make small commits with a clear scope. Avoid broad refactors unless required.
 - Preserve the current `shadcn/ui` base and project visual language.

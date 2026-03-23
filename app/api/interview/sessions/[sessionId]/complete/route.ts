@@ -5,24 +5,13 @@ import {
   createInterviewSessionService,
   SessionServiceError,
 } from "@/lib/session-service/session-service";
+import { completeSessionRequestSchema } from "@/lib/session-service/validation";
 
 type RouteContext = {
   params: Promise<{
     sessionId: string;
   }>;
 };
-
-interface CompleteSessionBody {
-  overallScore?: number;
-}
-
-function parseBody(body: unknown): CompleteSessionBody {
-  if (!body || typeof body !== "object") {
-    return {};
-  }
-
-  return body as CompleteSessionBody;
-}
 
 export async function POST(request: Request, context: RouteContext) {
   const user = await getWorkspaceUser();
@@ -32,7 +21,19 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { sessionId } = await context.params;
-  const body = parseBody(await request.json().catch(() => null));
+  const parsed = completeSessionRequestSchema.safeParse(
+    await request.json().catch(() => null),
+  );
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: "Invalid completion request.",
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      },
+      { status: 400 },
+    );
+  }
 
   const service = createInterviewSessionService(createDatabaseInterviewSessionStore());
 
@@ -40,7 +41,7 @@ export async function POST(request: Request, context: RouteContext) {
     const session = await service.completeSession({
       userId: user.id,
       sessionId,
-      overallScore: body.overallScore,
+      overallScore: parsed.data.overallScore,
     });
 
     return NextResponse.json(session);

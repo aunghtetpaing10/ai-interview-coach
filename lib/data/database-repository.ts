@@ -20,6 +20,7 @@ import {
   rubricDimensions,
   targetRoles,
 } from "@/db/schema";
+import { deriveActiveMode } from "@/lib/data/active-mode";
 import { getDb } from "@/lib/db/client";
 import type { InterviewDataRepository } from "@/lib/data/repository";
 
@@ -68,7 +69,7 @@ export function createDatabaseInterviewRepository(
         targetRole: activeTargetRole,
         jobTarget,
         resumeAsset,
-        activeMode: activeTargetRole ? "system-design" : "behavioral",
+        activeMode: deriveActiveMode(sessions),
         questionCount: questions.length,
         rubricCount: rubrics.length,
         recentSessionCount: sessions.length,

@@ -5,39 +5,13 @@ import {
   createInterviewSessionService,
   SessionServiceError,
 } from "@/lib/session-service/session-service";
-import type { TranscriptSpeaker } from "@/db/schema";
+import { appendTranscriptTurnsRequestSchema } from "@/lib/session-service/validation";
 
 type RouteContext = {
   params: Promise<{
     sessionId: string;
   }>;
 };
-
-type IncomingTurn = {
-  speaker?: TranscriptSpeaker;
-  body?: string;
-  seconds?: number;
-  confidence?: number;
-};
-
-type ValidIncomingTurn = {
-  speaker: TranscriptSpeaker;
-  body: string;
-  seconds: number;
-  confidence?: number;
-};
-
-interface AppendTurnsBody {
-  turns?: IncomingTurn[];
-}
-
-function parseBody(body: unknown): AppendTurnsBody {
-  if (!body || typeof body !== "object") {
-    return {};
-  }
-
-  return body as AppendTurnsBody;
-}
 
 export async function POST(request: Request, context: RouteContext) {
   const user = await getWorkspaceUser();
@@ -47,26 +21,18 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { sessionId } = await context.params;
-  const body = parseBody(await request.json().catch(() => null));
+  const parsed = appendTranscriptTurnsRequestSchema.safeParse(
+    await request.json().catch(() => null),
+  );
 
-  if (!Array.isArray(body.turns) || body.turns.length === 0) {
-    return NextResponse.json({ error: "turns are required." }, { status: 400 });
-  }
-
-  const turns = body.turns.filter(
-    (turn): turn is ValidIncomingTurn =>
-      Boolean(turn.speaker) &&
-      typeof turn.body === "string" &&
-      typeof turn.seconds === "number",
-  ).map((turn) => ({
-    speaker: turn.speaker,
-    body: turn.body,
-    seconds: turn.seconds,
-    confidence: turn.confidence,
-  }));
-
-  if (turns.length !== body.turns.length) {
-    return NextResponse.json({ error: "Invalid transcript turns." }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: "Invalid transcript turns.",
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      },
+      { status: 400 },
+    );
   }
 
   const service = createInterviewSessionService(createDatabaseInterviewSessionStore());
@@ -75,7 +41,7 @@ export async function POST(request: Request, context: RouteContext) {
     const session = await service.appendTranscriptTurns({
       userId: user.id,
       sessionId,
-      turns,
+      turns: parsed.data.turns,
     });
 
     return NextResponse.json(session);
