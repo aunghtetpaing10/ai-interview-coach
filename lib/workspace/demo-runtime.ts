@@ -11,6 +11,7 @@ import type {
   PracticePlanRow,
   ProfileRow,
   PromptVersionRow,
+  ReportGenerationJobRow,
   ResumeAssetRow,
   TargetRoleRow,
   TranscriptTurnRow,
@@ -153,6 +154,7 @@ type DemoWorkspaceState = {
   resumeAsset: ResumeAssetRow | null;
   sessions: InterviewSessionRow[];
   transcriptTurnsBySessionId: Map<string, TranscriptTurnRow[]>;
+  reportJobsBySessionId: Map<string, ReportGenerationJobRow>;
   reportsById: Map<string, DemoReportRecord>;
   reportIdBySessionId: Map<string, string>;
   nextSessionNumber: number;
@@ -196,6 +198,21 @@ type SerializedDemoWorkspaceState = {
       >,
     ]
   >;
+  reportJobsBySessionId: Array<
+    [
+      string,
+      Omit<
+        ReportGenerationJobRow,
+        "queuedAt" | "startedAt" | "finishedAt" | "createdAt" | "updatedAt"
+      > & {
+        queuedAt: string;
+        startedAt: string | null;
+        finishedAt: string | null;
+        createdAt: string;
+        updatedAt: string;
+      },
+    ]
+  >;
   reportsById: Array<
     [
       string,
@@ -227,6 +244,7 @@ function createInitialState(): DemoWorkspaceState {
     resumeAsset: buildResumeAsset(DEMO_USER.id, draft, null, now),
     sessions: [],
     transcriptTurnsBySessionId: new Map(),
+    reportJobsBySessionId: new Map(),
     reportsById: new Map(),
     reportIdBySessionId: new Map(),
     nextSessionNumber: 1,
@@ -273,6 +291,30 @@ function deserializeTranscriptTurn(
   return {
     ...turn,
     createdAt: new Date(turn.createdAt),
+  };
+}
+
+function serializeReportGenerationJob(job: ReportGenerationJobRow) {
+  return {
+    ...job,
+    queuedAt: job.queuedAt.toISOString(),
+    startedAt: job.startedAt?.toISOString() ?? null,
+    finishedAt: job.finishedAt?.toISOString() ?? null,
+    createdAt: job.createdAt.toISOString(),
+    updatedAt: job.updatedAt.toISOString(),
+  };
+}
+
+function deserializeReportGenerationJob(
+  job: SerializedDemoWorkspaceState["reportJobsBySessionId"][number][1],
+): ReportGenerationJobRow {
+  return {
+    ...job,
+    queuedAt: new Date(job.queuedAt),
+    startedAt: job.startedAt ? new Date(job.startedAt) : null,
+    finishedAt: job.finishedAt ? new Date(job.finishedAt) : null,
+    createdAt: new Date(job.createdAt),
+    updatedAt: new Date(job.updatedAt),
   };
 }
 
@@ -393,6 +435,9 @@ function serializeState(state: DemoWorkspaceState): SerializedDemoWorkspaceState
     transcriptTurnsBySessionId: [...state.transcriptTurnsBySessionId.entries()].map(
       ([sessionId, turns]) => [sessionId, turns.map(serializeTranscriptTurn)],
     ),
+    reportJobsBySessionId: [...state.reportJobsBySessionId.entries()].map(
+      ([sessionId, job]) => [sessionId, serializeReportGenerationJob(job)],
+    ),
     reportsById: [...state.reportsById.entries()].map(([reportId, record]) => [
       reportId,
       {
@@ -419,6 +464,12 @@ function deserializeState(state: SerializedDemoWorkspaceState): DemoWorkspaceSta
       state.transcriptTurnsBySessionId.map(([sessionId, turns]) => [
         sessionId,
         turns.map(deserializeTranscriptTurn),
+      ]),
+    ),
+    reportJobsBySessionId: new Map(
+      state.reportJobsBySessionId.map(([sessionId, job]) => [
+        sessionId,
+        deserializeReportGenerationJob(job),
       ]),
     ),
     reportsById: new Map(
@@ -838,6 +889,176 @@ class DemoRuntime {
         this.writeState(state);
 
         return clone(report);
+      },
+      getReportGenerationJobBySessionId: async (userId: string, sessionId: string) => {
+        const state = this.readState();
+
+        if (userId !== DEMO_USER.id) {
+          return null;
+        }
+
+        const job = state.reportJobsBySessionId.get(sessionId);
+        return job ? clone(job) : null;
+      },
+      enqueueReportGenerationJob: async (userId: string, sessionId: string) => {
+        const state = this.readState();
+
+        if (userId !== DEMO_USER.id) {
+          throw new Error("Session not found while queueing report generation.");
+        }
+
+        const session = state.sessions.find((candidate) => candidate.id === sessionId);
+
+        if (!session) {
+          throw new Error("Session not found while queueing report generation.");
+        }
+
+        const now = this.advanceTime(state);
+        const existingJob = state.reportJobsBySessionId.get(sessionId);
+        const job: ReportGenerationJobRow = {
+          id: existingJob?.id ?? `demo-report-job-${sessionId}`,
+          sessionId,
+          userId,
+          status: "queued",
+          reportId: null,
+          errorMessage: null,
+          attemptCount: 0,
+          queuedAt: now,
+          startedAt: null,
+          finishedAt: null,
+          createdAt: existingJob?.createdAt ?? now,
+          updatedAt: now,
+        };
+
+        state.reportJobsBySessionId.set(sessionId, job);
+        this.writeState(state);
+
+        return clone(job);
+      },
+      claimReportGenerationJob: async (input) => {
+        const state = this.readState();
+
+        if (input.userId !== DEMO_USER.id) {
+          return null;
+        }
+
+        const session = state.sessions.find((candidate) => candidate.id === input.sessionId);
+
+        if (!session) {
+          return null;
+        }
+
+        const job = state.reportJobsBySessionId.get(input.sessionId);
+
+        if (!job) {
+          return null;
+        }
+
+        if (input.reportJobId && job.id !== input.reportJobId) {
+          return null;
+        }
+
+        if (job.status === "completed" || job.status === "failed") {
+          return null;
+        }
+
+        if (job.status === "running" && job.attemptCount >= input.attemptCount) {
+          return null;
+        }
+
+        const now = this.advanceTime(state);
+        const updatedJob: ReportGenerationJobRow = {
+          ...job,
+          status: "running",
+          attemptCount: input.attemptCount,
+          startedAt: job.startedAt ?? now,
+          finishedAt: null,
+          errorMessage: null,
+          updatedAt: now,
+        };
+
+        state.reportJobsBySessionId.set(input.sessionId, updatedJob);
+        this.writeState(state);
+
+        return clone(updatedJob);
+      },
+      completeReportGenerationJob: async (
+        userId: string,
+        sessionId: string,
+        reportId: string,
+      ) => {
+        const state = this.readState();
+
+        if (userId !== DEMO_USER.id) {
+          throw new Error("Session not found while completing report generation.");
+        }
+
+        const session = state.sessions.find((candidate) => candidate.id === sessionId);
+
+        if (!session) {
+          throw new Error("Session not found while completing report generation.");
+        }
+
+        const now = this.advanceTime(state);
+        const existingJob = state.reportJobsBySessionId.get(sessionId);
+        const completedJob: ReportGenerationJobRow = {
+          id: existingJob?.id ?? `demo-report-job-${sessionId}`,
+          sessionId,
+          userId,
+          status: "completed",
+          reportId,
+          errorMessage: null,
+          attemptCount: existingJob?.attemptCount ?? 0,
+          queuedAt: existingJob?.queuedAt ?? now,
+          startedAt: existingJob?.startedAt ?? now,
+          finishedAt: now,
+          createdAt: existingJob?.createdAt ?? now,
+          updatedAt: now,
+        };
+
+        state.reportJobsBySessionId.set(sessionId, completedJob);
+        this.writeState(state);
+
+        return clone(completedJob);
+      },
+      failReportGenerationJob: async (
+        userId: string,
+        sessionId: string,
+        errorMessage: string,
+      ) => {
+        const state = this.readState();
+
+        if (userId !== DEMO_USER.id) {
+          throw new Error("Session not found while failing report generation.");
+        }
+
+        const session = state.sessions.find((candidate) => candidate.id === sessionId);
+
+        if (!session) {
+          throw new Error("Session not found while failing report generation.");
+        }
+
+        const now = this.advanceTime(state);
+        const existingJob = state.reportJobsBySessionId.get(sessionId);
+        const failedJob: ReportGenerationJobRow = {
+          id: existingJob?.id ?? `demo-report-job-${sessionId}`,
+          sessionId,
+          userId,
+          status: "failed",
+          reportId: existingJob?.reportId ?? null,
+          errorMessage,
+          attemptCount: existingJob?.attemptCount ?? 0,
+          queuedAt: existingJob?.queuedAt ?? now,
+          startedAt: existingJob?.startedAt ?? now,
+          finishedAt: now,
+          createdAt: existingJob?.createdAt ?? now,
+          updatedAt: now,
+        };
+
+        state.reportJobsBySessionId.set(sessionId, failedJob);
+        this.writeState(state);
+
+        return clone(failedJob);
       },
     };
   }

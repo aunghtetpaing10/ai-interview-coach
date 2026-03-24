@@ -1,6 +1,15 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
+import type {
+  FeedbackReportRow,
+  InterviewSessionRow,
+  NewReportGenerationJobRow,
+  ProfileRow,
+  PromptVersionRow,
+  TargetRoleRow,
+  TranscriptTurnRow,
+} from "@/db/schema";
 import {
   feedbackReports,
   interviewSessions,
@@ -8,21 +17,17 @@ import {
   practicePlans,
   profiles,
   promptVersions,
+  reportGenerationJobs,
   targetRoles,
   transcriptTurns,
 } from "@/db/schema";
 import { getDb } from "@/lib/db/client";
 import { generatePracticePlan, summarizeScorecard } from "@/lib/reporting/reporting";
-import { type InterviewReport, type ReportOverview } from "@/lib/reporting/types";
-import { type ReportGenerationContext, type ReportStore } from "@/lib/report-service/report-service";
-import { type TranscriptTurn } from "@/lib/types/interview";
-import { type FeedbackReportRow,
-  type InterviewSessionRow,
-  type ProfileRow,
-  type PromptVersionRow,
-  type TargetRoleRow,
-  type TranscriptTurnRow,
-} from "@/db/schema";
+import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
+import type { ReportGenerationContext, ReportStore } from "@/lib/report-service/report-service";
+import type { TranscriptTurn } from "@/lib/types/interview";
+
+type DbMutationClient = Pick<ReturnType<typeof getDb>, "select" | "insert" | "update">;
 
 function formatSessionDate(value: Date | null | undefined) {
   return new Intl.DateTimeFormat("en-US", {
@@ -90,6 +95,51 @@ function mapReportDetail(row: {
   return report;
 }
 
+function buildQueuedReportGenerationJobRow(
+  userId: string,
+  sessionId: string,
+  now: Date,
+): NewReportGenerationJobRow {
+  return {
+    userId,
+    sessionId,
+    status: "queued",
+    reportId: null,
+    errorMessage: null,
+    attemptCount: 0,
+    queuedAt: now,
+    startedAt: null,
+    finishedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+async function lockReportGenerationJobRow(
+  db: DbMutationClient,
+  userId: string,
+  sessionId: string,
+  reportJobId?: string,
+) {
+  const predicates = [
+    eq(reportGenerationJobs.userId, userId),
+    eq(reportGenerationJobs.sessionId, sessionId),
+  ];
+
+  if (reportJobId) {
+    predicates.push(eq(reportGenerationJobs.id, reportJobId));
+  }
+
+  const [job] = await db
+    .select()
+    .from(reportGenerationJobs)
+    .where(and(...predicates))
+    .for("update")
+    .limit(1);
+
+  return job ?? null;
+}
+
 export function createPostgresReportStore(): ReportStore {
   const db = getDb();
 
@@ -150,7 +200,7 @@ export function createPostgresReportStore(): ReportStore {
         .select()
         .from(transcriptTurns)
         .where(eq(transcriptTurns.sessionId, row.session.id))
-        .orderBy(transcriptTurns.sequenceIndex);
+        .orderBy(asc(transcriptTurns.sequenceIndex), asc(transcriptTurns.createdAt));
 
       return mapReportDetail({
         ...row,
@@ -198,7 +248,7 @@ export function createPostgresReportStore(): ReportStore {
         .select()
         .from(transcriptTurns)
         .where(eq(transcriptTurns.sessionId, session.id))
-        .orderBy(transcriptTurns.sequenceIndex);
+        .orderBy(asc(transcriptTurns.sequenceIndex), asc(transcriptTurns.createdAt));
 
       const [report] = await db
         .select()
@@ -289,6 +339,148 @@ export function createPostgresReportStore(): ReportStore {
       });
 
       return report;
+    },
+
+    async getReportGenerationJobBySessionId(userId, sessionId) {
+      const [job] = await db
+        .select()
+        .from(reportGenerationJobs)
+        .where(
+          and(
+            eq(reportGenerationJobs.userId, userId),
+            eq(reportGenerationJobs.sessionId, sessionId),
+          ),
+        )
+        .limit(1);
+
+      return job ?? null;
+    },
+
+    async enqueueReportGenerationJob(userId, sessionId) {
+      const now = new Date();
+      const [job] = await db
+        .insert(reportGenerationJobs)
+        .values(buildQueuedReportGenerationJobRow(userId, sessionId, now))
+        .onConflictDoUpdate({
+          target: reportGenerationJobs.sessionId,
+          set: {
+            userId,
+            status: "queued",
+            reportId: null,
+            errorMessage: null,
+            attemptCount: 0,
+            queuedAt: now,
+            startedAt: null,
+            finishedAt: null,
+            updatedAt: now,
+          },
+        })
+        .returning();
+
+      if (!job) {
+        throw new Error("Failed to enqueue report generation.");
+      }
+
+      return job;
+    },
+
+    async claimReportGenerationJob(input) {
+      return db.transaction(async (tx) => {
+        const job = await lockReportGenerationJobRow(
+          tx,
+          input.userId,
+          input.sessionId,
+          input.reportJobId,
+        );
+
+        if (!job) {
+          return null;
+        }
+
+        if (job.status === "completed" || job.status === "failed") {
+          return null;
+        }
+
+        if (job.status === "running" && job.attemptCount >= input.attemptCount) {
+          return null;
+        }
+
+        const now = new Date();
+        const [updatedJob] = await tx
+          .update(reportGenerationJobs)
+          .set({
+            status: "running",
+            attemptCount: input.attemptCount,
+            startedAt: job.startedAt ?? now,
+            finishedAt: null,
+            errorMessage: null,
+            updatedAt: now,
+          })
+          .where(eq(reportGenerationJobs.id, job.id))
+          .returning();
+
+        return updatedJob ?? null;
+      });
+    },
+
+    async completeReportGenerationJob(userId, sessionId, reportId) {
+      const now = new Date();
+      const [job] = await db
+        .insert(reportGenerationJobs)
+        .values({
+          ...buildQueuedReportGenerationJobRow(userId, sessionId, now),
+          status: "completed",
+          reportId,
+          startedAt: now,
+          finishedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: reportGenerationJobs.sessionId,
+          set: {
+            userId,
+            status: "completed",
+            reportId,
+            errorMessage: null,
+            finishedAt: now,
+            updatedAt: now,
+          },
+        })
+        .returning();
+
+      if (!job) {
+        throw new Error("Failed to mark report generation complete.");
+      }
+
+      return job;
+    },
+
+    async failReportGenerationJob(userId, sessionId, errorMessage) {
+      const now = new Date();
+      const [job] = await db
+        .insert(reportGenerationJobs)
+        .values({
+          ...buildQueuedReportGenerationJobRow(userId, sessionId, now),
+          status: "failed",
+          errorMessage,
+          finishedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: reportGenerationJobs.sessionId,
+          set: {
+            userId,
+            status: "failed",
+            errorMessage,
+            finishedAt: now,
+            updatedAt: now,
+          },
+        })
+        .returning();
+
+      if (!job) {
+        throw new Error("Failed to mark report generation failed.");
+      }
+
+      return job;
     },
   };
 }
