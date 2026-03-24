@@ -193,4 +193,48 @@ describe("buildDashboardReadModel", () => {
     expect(model.latestSession).toBeNull();
     expect(model.heroDescription).toMatch(/save onboarding data/i);
   });
+
+  it("surfaces a pending report workflow while the latest session is still processing", () => {
+    const model = buildDashboardReadModel({
+      workspace: makeWorkspaceSnapshot(),
+      reportOverviews: [],
+      latestReport: null,
+      reportWorkflow: {
+        sessionId: "session-1",
+        status: "running",
+      },
+      progressSnapshot: makeProgressSnapshot(),
+      completedSessionCount: 1,
+    });
+
+    expect(model.reportWorkflow).toEqual({
+      sessionId: "session-1",
+      href: "/reports/processing/session-1",
+      label: "Track report status",
+      description: "The latest completed session is still processing in the background.",
+      status: "running",
+      error: undefined,
+    });
+    expect(model.nextDrillTitle).toBe("Wait for the latest report");
+    expect(model.stats[2]?.copy).toMatch(/background report job is still processing/i);
+  });
+
+  it("surfaces a failed report workflow with a retry path", () => {
+    const model = buildDashboardReadModel({
+      workspace: makeWorkspaceSnapshot(),
+      reportOverviews: [],
+      latestReport: null,
+      reportWorkflow: {
+        sessionId: "session-1",
+        status: "failed",
+        error: "OpenAI report generation failed.",
+      },
+      progressSnapshot: makeProgressSnapshot(),
+      completedSessionCount: 1,
+    });
+
+    expect(model.reportWorkflow?.label).toBe("Retry report");
+    expect(model.reportWorkflow?.description).toBe("OpenAI report generation failed.");
+    expect(model.heroDescription).toMatch(/report generation failed/i);
+  });
 });

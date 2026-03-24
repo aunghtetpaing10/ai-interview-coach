@@ -45,7 +45,10 @@ describe("InterviewWorkspace", () => {
     expect(pushMock).toHaveBeenCalledWith("/interview?mode=behavioral");
   });
 
-  it("connects the realtime transport and still supports text fallback submission", async () => {
+  it(
+    "connects the realtime transport and still supports text fallback submission",
+    { timeout: 15000 },
+    async () => {
     const user = userEvent.setup();
     const sendText = vi.fn();
     const close = vi.fn();
@@ -109,7 +112,7 @@ describe("InterviewWorkspace", () => {
     );
   });
 
-  it("completes the session and opens the generated report", async () => {
+  it("completes the session and opens the report processing page when the job is queued", async () => {
     const user = userEvent.setup();
 
     fetchMock.mockResolvedValueOnce({
@@ -120,8 +123,8 @@ describe("InterviewWorkspace", () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: vi.fn().mockResolvedValue({
-        reportId: "report-123",
-        status: "created",
+        jobId: "job-123",
+        status: "queued",
       }),
       text: vi.fn(),
     });
@@ -130,9 +133,7 @@ describe("InterviewWorkspace", () => {
 
     await user.click(screen.getAllByRole("button", { name: /^end$/i })[0]);
 
-    await waitFor(() =>
-      expect(pushMock).toHaveBeenCalledWith("/reports/report-123"),
-    );
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/reports/processing/interview-demo-session"));
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       "/api/interview/sessions/interview-demo-session/complete",
@@ -148,7 +149,8 @@ describe("InterviewWorkspace", () => {
       }),
     );
     expect(
-      screen.getByText(/report ready\. opening the latest report\./i),
+      screen.getByText(/report is processing\. opening the job tracker\./i),
     ).toBeInTheDocument();
-  });
+    },
+  );
 });

@@ -15,19 +15,28 @@ vi.mock("@/lib/workspace/runtime", () => ({
   createWorkspaceReportStore: createWorkspaceReportStoreMock,
 }));
 
-vi.mock("@/lib/report-service/report-service", () => ({
-  createReportService: createReportServiceMock,
-}));
+vi.mock("@/lib/report-service/report-service", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/report-service/report-service")>(
+    "@/lib/report-service/report-service",
+  );
+
+  return {
+    ...actual,
+    createReportService: createReportServiceMock,
+  };
+});
 
 import { GET as getReportRoute } from "@/app/api/reports/[id]/route";
-import { POST as createReportRoute } from "@/app/api/interview/sessions/[sessionId]/report/route";
+import {
+  GET as getSessionReportStatusRoute,
+  POST as createReportRoute,
+} from "@/app/api/interview/sessions/[sessionId]/report/route";
 import { GET as listReportsRoute } from "@/app/api/reports/route";
+import { ReportServiceError } from "@/lib/report-service/report-service";
 
 describe("report api routes", () => {
   beforeEach(() => {
-    getWorkspaceUserMock.mockReset();
-    createWorkspaceReportStoreMock.mockReset();
-    createReportServiceMock.mockReset();
+    vi.clearAllMocks();
   });
 
   const reportOverview: ReportOverview = {
@@ -95,7 +104,6 @@ describe("report api routes", () => {
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([reportOverview]),
       getReportById: vi.fn(),
-      generateAndStoreReport: vi.fn(),
     });
 
     const response = await listReportsRoute();
@@ -115,7 +123,6 @@ describe("report api routes", () => {
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn(),
       getReportById: vi.fn().mockResolvedValue(reportDetail),
-      generateAndStoreReport: vi.fn(),
     });
 
     const response = await getReportRoute(undefined as never, {
@@ -137,7 +144,6 @@ describe("report api routes", () => {
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn(),
       getReportById: vi.fn().mockResolvedValue(null),
-      generateAndStoreReport: vi.fn(),
     });
 
     const response = await getReportRoute(undefined as never, {
@@ -147,18 +153,65 @@ describe("report api routes", () => {
     expect(response.status).toBe(404);
   });
 
-  it("creates or updates a report for a completed session", async () => {
+  it("returns the background report job status for a completed session", async () => {
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "user_1",
+      email: "candidate@example.com",
+      source: "demo",
+    });
+    createReportServiceMock.mockReturnValue({
+      getReportGenerationState: vi.fn().mockResolvedValue({
+        jobId: "job-1",
+        status: "running",
+      }),
+    });
+
+    const response = await getSessionReportStatusRoute(undefined as never, {
+      params: Promise.resolve({ sessionId: "session-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jobId: "job-1",
+      status: "running",
+    });
+  });
+
+  it("queues report generation for a completed session", async () => {
     getWorkspaceUserMock.mockResolvedValue({
       id: "user_1",
       email: "candidate@example.com",
       source: "supabase",
     });
     createReportServiceMock.mockReturnValue({
-      listReportOverviews: vi.fn(),
-      getReportById: vi.fn(),
-      generateAndStoreReport: vi.fn().mockResolvedValue({
-        report: reportDetail,
-        status: "created",
+      requestReportGeneration: vi.fn().mockResolvedValue({
+        jobId: "job-1",
+        status: "queued",
+      }),
+    });
+
+    const response = await createReportRoute(undefined as never, {
+      params: Promise.resolve({ sessionId: "session-1" }),
+    });
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual({
+      jobId: "job-1",
+      status: "queued",
+    });
+  });
+
+  it("returns the completed report when the report already exists", async () => {
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "user_1",
+      email: "candidate@example.com",
+      source: "supabase",
+    });
+    createReportServiceMock.mockReturnValue({
+      requestReportGeneration: vi.fn().mockResolvedValue({
+        jobId: "job-1",
+        status: "completed",
+        reportId: "report-1",
       }),
     });
 
@@ -168,8 +221,36 @@ describe("report api routes", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
+      jobId: "job-1",
+      status: "completed",
       reportId: "report-1",
-      status: "created",
+    });
+  });
+
+  it("returns a 503 when background processing is unavailable", async () => {
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "user_1",
+      email: "candidate@example.com",
+      source: "supabase",
+    });
+    createReportServiceMock.mockReturnValue({
+      requestReportGeneration: vi.fn().mockRejectedValue(
+        new ReportServiceError(
+          "Report generation is unavailable until Inngest and OpenAI are configured.",
+          "unavailable",
+          503,
+        ),
+      ),
+    });
+
+    const response = await createReportRoute(undefined as never, {
+      params: Promise.resolve({ sessionId: "session-1" }),
+    });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Report generation is unavailable until Inngest and OpenAI are configured.",
+      code: "unavailable",
     });
   });
 });

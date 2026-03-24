@@ -18,6 +18,7 @@ const ONBOARDING = {
 } as const;
 
 let latestReportId: string | null = null;
+let latestSessionId: string | null = null;
 
 async function seedOnboardingDraft(page: Page) {
   await page.goto("/onboarding");
@@ -59,7 +60,7 @@ async function seedOnboardingDraft(page: Page) {
   ).toBeVisible();
 }
 
-async function completeInterviewAndOpenReport(page: Page) {
+async function completeInterviewToProcessing(page: Page) {
   await seedOnboardingDraft(page);
 
   await page.goto("/interview?mode=system-design");
@@ -84,6 +85,12 @@ async function completeInterviewAndOpenReport(page: Page) {
 
   await page.getByRole("button", { name: /^end$/i }).click();
 
+  await page.waitForURL(/\/reports\/processing\/[^/]+$/);
+
+  return page.url().match(/\/reports\/processing\/([^/]+)$/)?.[1] ?? null;
+}
+
+async function waitForReportDetail(page: Page) {
   await page.waitForURL(/\/reports\/[^/]+$/);
   await expect(page.getByText(/report archive/i)).toBeVisible();
   await expect(page.getByText(/session metadata/i)).toBeVisible();
@@ -113,25 +120,29 @@ test("saves onboarding and rehydrates the draft on reload", async ({ page }) => 
   );
 });
 
-test("drives the interview loop through report generation", async ({ page }) => {
-  latestReportId = await completeInterviewAndOpenReport(page);
+test("drives the interview loop through the processing route into the final report", async ({
+  page,
+}) => {
+  latestSessionId = await completeInterviewToProcessing(page);
+
+  await expect(page).toHaveURL(/\/reports\/processing\/[^/]+$/);
+  latestReportId = await waitForReportDetail(page);
 
   await expect(page).toHaveURL(/\/reports\/[^/]+$/);
   await expect(page.getByText(/report archive/i)).toBeVisible();
   await expect(page.getByText(/session metadata/i)).toBeVisible();
 });
 
-test("shows the completed session on dashboard and progress", async ({ page }) => {
-  if (!latestReportId) {
-    latestReportId = await completeInterviewAndOpenReport(page);
-  }
+test("shows pending report workflow on dashboard and progress before completion", async ({
+  page,
+}) => {
+  latestSessionId = await completeInterviewToProcessing(page);
 
   await page.goto("/dashboard");
 
-  await expect(
-    page.getByRole("heading", { name: /good evening,/i }),
-  ).toBeVisible();
-  await expect(page.getByRole("link", { name: /open latest report/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /good evening,/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /track report status/i })).toBeVisible();
+  await expect(page.getByText(/latest report processing/i)).toBeVisible();
 
   await page.goto("/progress");
 
@@ -140,18 +151,37 @@ test("shows the completed session on dashboard and progress", async ({ page }) =
       name: /the interview loop is trending upward and the telemetry layer is visible\./i,
     }),
   ).toBeVisible();
+  await expect(page.getByText(/the latest report is still processing\./i)).toBeVisible();
+  await expect(page.getByRole("link", { name: /track report status/i })).toBeVisible();
+
+  await page.goto(`/reports/processing/${latestSessionId}`);
+  latestReportId = await waitForReportDetail(page);
+
+  await page.goto("/dashboard");
+  await expect(page.getByRole("link", { name: /open latest report/i })).toBeVisible();
+
+  await page.goto("/progress");
   await expect(page.getByRole("heading", { name: /recent interview sessions/i })).toBeVisible();
   await expect(page.getByText("system-design").first()).toBeVisible();
 });
 
-test("redirects the reports index to the latest completed report", async ({ page }) => {
-  if (!latestReportId) {
-    latestReportId = await completeInterviewAndOpenReport(page);
-  }
+test("routes /reports through processing while pending and back to the latest report after completion", async ({
+  page,
+}) => {
+  latestSessionId = await completeInterviewToProcessing(page);
 
   await page.goto("/reports");
 
-  await expect(page).toHaveURL(/\/reports\/[^/]+$/);
+  await expect(page).toHaveURL(/\/reports$/);
+  await expect(page.getByText(/latest report is processing\./i)).toBeVisible();
+  await expect(page.getByRole("link", { name: /open processing/i })).toBeVisible();
+
+  await page.goto(`/reports/processing/${latestSessionId}`);
+  latestReportId = await waitForReportDetail(page);
+
+  await page.goto("/reports");
+
+  await expect(page).toHaveURL(new RegExp(`/reports/${latestReportId}$`));
   await expect(page.getByText(/report archive/i)).toBeVisible();
   await expect(page.getByText(/session metadata/i)).toBeVisible();
 });

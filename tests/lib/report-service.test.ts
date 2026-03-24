@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -10,6 +10,8 @@ import type {
   ReportOverview,
   ScorecardSummary,
 } from "@/lib/reporting/types";
+import type { ReportGenerationContext } from "@/lib/report-service/report-service";
+import type { ReportGenerationJobRow } from "@/db/schema";
 import { createReportService } from "@/lib/report-service/report-service";
 
 const scorecardSummary: ScorecardSummary = {
@@ -116,7 +118,108 @@ const reportDetail: InterviewReport = {
   practicePlan,
 };
 
+function makeGenerationContext(
+  overrides: Partial<ReportGenerationContext> = {},
+): ReportGenerationContext {
+  return {
+    session: {
+      id: "session-123",
+      userId: "user_1",
+      targetRoleId: "target-1",
+      mode: "project",
+      status: "completed",
+      title: "Queue scaling drill",
+      overallScore: 84,
+      durationSeconds: 18 * 60,
+      startedAt: new Date("2026-03-19T10:00:00.000Z"),
+      endedAt: new Date("2026-03-19T10:18:00.000Z"),
+      createdAt: new Date("2026-03-19T09:59:00.000Z"),
+      updatedAt: new Date("2026-03-19T10:18:00.000Z"),
+    },
+    profile: {
+      id: "profile-1",
+      userId: "user_1",
+      fullName: "Aung Paing",
+      headline: "Platform engineer",
+      targetRole: "Platform engineer",
+      createdAt: new Date("2026-03-19T09:00:00.000Z"),
+      updatedAt: new Date("2026-03-19T09:00:00.000Z"),
+    },
+    targetRole: {
+      id: "target-1",
+      userId: "user_1",
+      title: "Platform engineer",
+      companyType: "startup",
+      level: "mid-level",
+      focusAreas: ["systems-thinking", "technical-depth"],
+      active: true,
+      createdAt: new Date("2026-03-19T09:00:00.000Z"),
+    },
+    jobTarget: null,
+    promptVersion: {
+      id: "prompt-1",
+      label: "Scorecard v1",
+      model: "gpt-5.2",
+      hash: "sha256:scorecard-v1",
+      notes: "Baseline scoring prompt.",
+      publishedAt: new Date("2026-03-19T00:00:00.000Z"),
+    },
+    transcript: [
+      {
+        id: "turn-1",
+        sessionId: "session-123",
+        speaker: "interviewer",
+        body: "Tell me about the payment queue you scaled.",
+        seconds: 14,
+        sequenceIndex: 0,
+        confidence: 100,
+        createdAt: new Date("2026-03-19T10:00:14.000Z"),
+      },
+      {
+        id: "turn-2",
+        sessionId: "session-123",
+        speaker: "candidate",
+        body: "I owned the retry policy and moved the queue onto Kafka.",
+        seconds: 29,
+        sequenceIndex: 1,
+        confidence: 100,
+        createdAt: new Date("2026-03-19T10:00:29.000Z"),
+      },
+    ],
+    report: null,
+    practicePlan: null,
+    ...overrides,
+  };
+}
+
+function makeJob(
+  status: ReportGenerationJobRow["status"],
+  overrides: Partial<ReportGenerationJobRow> = {},
+): ReportGenerationJobRow {
+  const now = new Date("2026-03-19T10:20:00.000Z");
+
+  return {
+    id: "job-123",
+    sessionId: "session-123",
+    userId: "user_1",
+    status,
+    reportId: status === "completed" ? "report-123" : null,
+    errorMessage: status === "failed" ? "Report generation failed." : null,
+    attemptCount: status === "running" ? 1 : 0,
+    queuedAt: now,
+    startedAt: status === "queued" ? null : now,
+    finishedAt: status === "completed" || status === "failed" ? now : null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
 describe("report service", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("returns report overviews newest-first", async () => {
     const store = {
       listReportOverviews: vi.fn().mockResolvedValue([reportOverview]),
@@ -152,74 +255,7 @@ describe("report service", () => {
     const store = {
       listReportOverviews: vi.fn(),
       getReportById: vi.fn(),
-      loadGenerationContext: vi.fn().mockResolvedValue({
-        session: {
-          id: "session-123",
-          userId: "user_1",
-          targetRoleId: "target-1",
-          mode: "project",
-          status: "completed",
-          title: "Queue scaling drill",
-          overallScore: 84,
-          durationSeconds: 18 * 60,
-          startedAt: new Date("2026-03-19T10:00:00.000Z"),
-          endedAt: new Date("2026-03-19T10:18:00.000Z"),
-          createdAt: new Date("2026-03-19T09:59:00.000Z"),
-          updatedAt: new Date("2026-03-19T10:18:00.000Z"),
-        },
-        profile: {
-          id: "profile-1",
-          userId: "user_1",
-          fullName: "Aung Paing",
-          headline: "Platform engineer",
-          targetRole: "Platform engineer",
-          createdAt: new Date("2026-03-19T09:00:00.000Z"),
-          updatedAt: new Date("2026-03-19T09:00:00.000Z"),
-        },
-        targetRole: {
-          id: "target-1",
-          userId: "user_1",
-          title: "Platform engineer",
-          companyType: "startup",
-          level: "mid-level",
-          focusAreas: ["systems-thinking", "technical-depth"],
-          active: true,
-          createdAt: new Date("2026-03-19T09:00:00.000Z"),
-        },
-        jobTarget: null,
-        promptVersion: {
-          id: "prompt-1",
-          label: "Scorecard v1",
-          model: "gpt-5.2",
-          hash: "sha256:scorecard-v1",
-          notes: "Baseline scoring prompt.",
-          publishedAt: new Date("2026-03-19T00:00:00.000Z"),
-        },
-        transcript: [
-          {
-            id: "turn-1",
-            sessionId: "session-123",
-            speaker: "interviewer",
-            body: "Tell me about the payment queue you scaled.",
-            seconds: 14,
-            sequenceIndex: 0,
-            confidence: 100,
-            createdAt: new Date("2026-03-19T10:00:14.000Z"),
-          },
-          {
-            id: "turn-2",
-            sessionId: "session-123",
-            speaker: "candidate",
-            body: "I owned the retry policy and moved the queue onto Kafka.",
-            seconds: 29,
-            sequenceIndex: 1,
-            confidence: 100,
-            createdAt: new Date("2026-03-19T10:00:29.000Z"),
-          },
-        ],
-        report: null,
-        practicePlan: null,
-      }),
+      loadGenerationContext: vi.fn().mockResolvedValue(makeGenerationContext()),
       saveGeneratedReport: vi.fn().mockImplementation(async (_userId, _context, report) => {
         saved.push(report);
         return report;
@@ -243,61 +279,30 @@ describe("report service", () => {
     const store = {
       listReportOverviews: vi.fn(),
       getReportById: vi.fn(),
-      loadGenerationContext: vi.fn().mockResolvedValue({
-        session: {
-          id: "session-123",
-          userId: "user_1",
-          targetRoleId: "target-1",
-          mode: "project",
-          status: "completed",
-          title: "Queue scaling drill",
-          overallScore: 84,
-          durationSeconds: 18 * 60,
-          startedAt: new Date("2026-03-19T10:00:00.000Z"),
-          endedAt: new Date("2026-03-19T10:18:00.000Z"),
-          createdAt: new Date("2026-03-19T09:59:00.000Z"),
-          updatedAt: new Date("2026-03-19T10:18:00.000Z"),
-        },
-        profile: null,
-        targetRole: null,
-        jobTarget: null,
-        promptVersion: null,
-        transcript: [],
-        report: {
-          id: "report-existing",
-          sessionDate: "March 19, 2026",
-          title: "Queue scaling drill",
-          candidate: "Candidate",
-          targetRole: "Target role",
-          promptVersion: "Generated prompt",
-          scorecard: {
-            mode: "project",
-            overallScore: 84,
-            competencies: {
-              clarity: 84,
-              ownership: 78,
-              "technical-depth": 87,
-              communication: 80,
-              "systems-thinking": 75,
-            },
+      loadGenerationContext: vi.fn().mockResolvedValue(
+        makeGenerationContext({
+          report: {
+            id: "report-existing",
+            sessionId: "session-123",
+            promptVersionId: "prompt-1",
+            summary: scorecardSummary.headline,
+            scorecard: reportOverview.scorecard,
+            strengths: scorecardSummary.strengths,
+            gaps: scorecardSummary.growthAreas,
+            citations: [],
+            rewrites: [],
+            createdAt: new Date("2026-03-19T10:18:00.000Z"),
           },
-          summary: scorecardSummary,
-          strengths: scorecardSummary.strengths,
-          growthAreas: scorecardSummary.growthAreas,
-          transcript: [],
-          citations: [],
-          rewrites: [],
-          practicePlan,
-        },
-        practicePlan: {
-          id: "plan-existing",
-          sessionId: "session-123",
-          title: "Platform engineer practice plan",
-          focus: scorecardSummary.headline,
-          steps: [],
-          createdAt: new Date("2026-03-19T10:18:00.000Z"),
-        },
-      }),
+          practicePlan: {
+            id: "plan-existing",
+            sessionId: "session-123",
+            title: "Platform engineer practice plan",
+            focus: scorecardSummary.headline,
+            steps: [],
+            createdAt: new Date("2026-03-19T10:18:00.000Z"),
+          },
+        }),
+      ),
       saveGeneratedReport: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -306,5 +311,242 @@ describe("report service", () => {
 
     expect(result.status).toBe("updated");
     expect(result.report.id).toBe("report-existing");
+  });
+
+  it("queues report generation and publishes the background job event", async () => {
+    const publish = vi.fn().mockResolvedValue(undefined);
+    const queuedJob = makeJob("queued");
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue(makeGenerationContext()),
+      saveGeneratedReport: vi.fn(),
+      getReportGenerationJobBySessionId: vi.fn().mockResolvedValue(null),
+      enqueueReportGenerationJob: vi.fn().mockResolvedValue(queuedJob),
+      claimReportGenerationJob: vi.fn(),
+      completeReportGenerationJob: vi.fn(),
+      failReportGenerationJob: vi.fn(),
+    };
+
+    const service = createReportService(store, {
+      backgroundProcessingAvailable: true,
+      publishReportGenerationRequestedEvent: publish,
+    });
+    const result = await service.requestReportGeneration("user_1", "session-123");
+
+    expect(result).toEqual({
+      jobId: queuedJob.id,
+      status: "queued",
+      reportId: undefined,
+      error: undefined,
+    });
+    expect(store.enqueueReportGenerationJob).toHaveBeenCalledWith("user_1", "session-123");
+    expect(publish).toHaveBeenCalledWith({
+      userId: "user_1",
+      sessionId: "session-123",
+      reportJobId: queuedJob.id,
+    });
+  });
+
+  it("returns the existing running job without re-enqueueing", async () => {
+    const publish = vi.fn().mockResolvedValue(undefined);
+    const runningJob = makeJob("running", { attemptCount: 2 });
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue(makeGenerationContext()),
+      saveGeneratedReport: vi.fn(),
+      getReportGenerationJobBySessionId: vi.fn().mockResolvedValue(runningJob),
+      enqueueReportGenerationJob: vi.fn(),
+      claimReportGenerationJob: vi.fn(),
+      completeReportGenerationJob: vi.fn(),
+      failReportGenerationJob: vi.fn(),
+    };
+
+    const service = createReportService(store, {
+      backgroundProcessingAvailable: true,
+      publishReportGenerationRequestedEvent: publish,
+    });
+    const result = await service.requestReportGeneration("user_1", "session-123");
+
+    expect(result.status).toBe("running");
+    expect(store.enqueueReportGenerationJob).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("returns a completed report state when the report already exists", async () => {
+    const completedJob = makeJob("completed");
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue(
+        makeGenerationContext({
+          report: {
+            id: "report-123",
+            sessionId: "session-123",
+            promptVersionId: "prompt-1",
+            summary: scorecardSummary.headline,
+            scorecard: reportOverview.scorecard,
+            strengths: scorecardSummary.strengths,
+            gaps: scorecardSummary.growthAreas,
+            citations: [],
+            rewrites: [],
+            createdAt: new Date("2026-03-19T10:18:00.000Z"),
+          },
+        }),
+      ),
+      saveGeneratedReport: vi.fn(),
+      getReportGenerationJobBySessionId: vi.fn(),
+      enqueueReportGenerationJob: vi.fn(),
+      claimReportGenerationJob: vi.fn(),
+      completeReportGenerationJob: vi.fn().mockResolvedValue(completedJob),
+      failReportGenerationJob: vi.fn(),
+    };
+
+    const service = createReportService(store, {
+      backgroundProcessingAvailable: true,
+      publishReportGenerationRequestedEvent: vi.fn(),
+    });
+    const result = await service.requestReportGeneration("user_1", "session-123");
+
+    expect(result).toEqual({
+      jobId: completedJob.id,
+      status: "completed",
+      reportId: "report-123",
+      error: undefined,
+    });
+    expect(store.completeReportGenerationJob).toHaveBeenCalledWith(
+      "user_1",
+      "session-123",
+      "report-123",
+    );
+  });
+
+  it("throws a 503 when background processing is unavailable", async () => {
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue(makeGenerationContext()),
+      saveGeneratedReport: vi.fn(),
+      getReportGenerationJobBySessionId: vi.fn(),
+      enqueueReportGenerationJob: vi.fn(),
+      claimReportGenerationJob: vi.fn(),
+      completeReportGenerationJob: vi.fn(),
+      failReportGenerationJob: vi.fn(),
+    };
+
+    const service = createReportService(store);
+
+    await expect(service.requestReportGeneration("user_1", "session-123")).rejects.toMatchObject({
+      code: "unavailable",
+      status: 503,
+    });
+  });
+
+  it("returns the current queued job state", async () => {
+    const queuedJob = makeJob("queued");
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue(makeGenerationContext()),
+      saveGeneratedReport: vi.fn(),
+      getReportGenerationJobBySessionId: vi.fn().mockResolvedValue(queuedJob),
+      enqueueReportGenerationJob: vi.fn(),
+      claimReportGenerationJob: vi.fn(),
+      completeReportGenerationJob: vi.fn(),
+      failReportGenerationJob: vi.fn(),
+    };
+
+    const service = createReportService(store);
+    const result = await service.getReportGenerationState("user_1", "session-123");
+
+    expect(result).toEqual({
+      jobId: queuedJob.id,
+      status: "queued",
+      reportId: undefined,
+      error: undefined,
+    });
+  });
+
+  it("processes a claimed queued job into a completed report", async () => {
+    const completedJob = makeJob("completed");
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue(makeGenerationContext()),
+      saveGeneratedReport: vi.fn().mockResolvedValue(reportDetail),
+      getReportGenerationJobBySessionId: vi.fn().mockResolvedValue(completedJob),
+      enqueueReportGenerationJob: vi.fn(),
+      claimReportGenerationJob: vi.fn().mockResolvedValue(makeJob("running", { attemptCount: 1 })),
+      completeReportGenerationJob: vi.fn().mockResolvedValue(completedJob),
+      failReportGenerationJob: vi.fn(),
+    };
+
+    const service = createReportService(store);
+    const result = await service.processQueuedReportGeneration({
+      userId: "user_1",
+      sessionId: "session-123",
+      reportJobId: "job-123",
+      attemptCount: 1,
+      maxAttempts: 3,
+    });
+
+    expect(result).toEqual({
+      jobId: completedJob.id,
+      status: "completed",
+      reportId: "report-123",
+      error: undefined,
+    });
+    expect(store.claimReportGenerationJob).toHaveBeenCalledWith({
+      userId: "user_1",
+      sessionId: "session-123",
+      reportJobId: "job-123",
+      attemptCount: 1,
+    });
+    expect(store.completeReportGenerationJob).toHaveBeenCalledWith(
+      "user_1",
+      "session-123",
+      expect.any(String),
+    );
+  });
+
+  it("marks the job as failed on the final retry", async () => {
+    const evaluator = {
+      evaluate: vi.fn().mockRejectedValue(new Error("OpenAI report evaluation failed.")),
+    };
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue(makeGenerationContext()),
+      saveGeneratedReport: vi.fn(),
+      getReportGenerationJobBySessionId: vi.fn().mockResolvedValue(makeJob("running")),
+      enqueueReportGenerationJob: vi.fn(),
+      claimReportGenerationJob: vi.fn().mockResolvedValue(makeJob("running", { attemptCount: 3 })),
+      completeReportGenerationJob: vi.fn(),
+      failReportGenerationJob: vi.fn().mockResolvedValue(
+        makeJob("failed", {
+          errorMessage: "OpenAI report evaluation failed.",
+          attemptCount: 3,
+        }),
+      ),
+    };
+
+    const service = createReportService(store, { evaluator });
+
+    await expect(
+      service.processQueuedReportGeneration({
+        userId: "user_1",
+        sessionId: "session-123",
+        reportJobId: "job-123",
+        attemptCount: 3,
+        maxAttempts: 3,
+      }),
+    ).rejects.toThrow("OpenAI report evaluation failed.");
+
+    expect(store.failReportGenerationJob).toHaveBeenCalledWith(
+      "user_1",
+      "session-123",
+      "OpenAI report evaluation failed.",
+    );
   });
 });

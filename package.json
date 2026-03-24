@@ -12,6 +12,7 @@
     "test": "vitest run --coverage --config vitest.config.mjs",
     "test:watch": "vitest --config vitest.config.mjs",
     "test:e2e": "playwright test",
+    "inngest:dev": "tsx scripts/inngest-dev.ts",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "db:generate": "dotenv -e .env -- drizzle-kit generate",

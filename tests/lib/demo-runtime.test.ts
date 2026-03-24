@@ -48,12 +48,17 @@ describe("demo runtime", () => {
     expect(reloadedAgain.roleTitle).toBe("Staff Platform Engineer");
   });
 
-  it("drives a session through completion, report generation, and progress", async () => {
+  it("drives a session through completion, queued report generation, and progress", async () => {
     const user = demoRuntime.getDemoWorkspaceUser();
     const repository = demoRuntime.createDemoInterviewRepository();
     const sessionStore = demoRuntime.createDemoInterviewSessionStore();
     const reportStore = demoRuntime.createDemoReportStore();
     const progressStore = demoRuntime.createDemoProgressStore();
+    const publish = vi.fn().mockResolvedValue(undefined);
+    const requestService = createReportService(reportStore, {
+      backgroundProcessingAvailable: true,
+      publishReportGenerationRequestedEvent: publish,
+    });
     const reportService = createReportService(reportStore);
 
     const snapshotBefore = await repository.getWorkspaceSnapshot(user.id);
@@ -115,12 +120,25 @@ describe("demo runtime", () => {
 
     expect(completed.status).toBe("completed");
 
-    const firstGeneration = await reportService.generateAndStoreReport(user.id, session.id);
-    const secondGeneration = await reportService.generateAndStoreReport(user.id, session.id);
+    const queued = await requestService.requestReportGeneration(user.id, session.id);
+    const completedState = await reportService.processQueuedReportGeneration({
+      userId: user.id,
+      sessionId: session.id,
+      reportJobId: queued.jobId,
+      attemptCount: 1,
+      maxAttempts: 3,
+    });
+    const secondGeneration = await requestService.requestReportGeneration(user.id, session.id);
 
-    expect(firstGeneration.status).toBe("created");
-    expect(secondGeneration.status).toBe("updated");
-    expect(secondGeneration.report.id).toBe(firstGeneration.report.id);
+    expect(queued.status).toBe("queued");
+    expect(completedState?.status).toBe("completed");
+    expect(secondGeneration.status).toBe("completed");
+    expect(secondGeneration.reportId).toBe(completedState?.reportId);
+    expect(publish).toHaveBeenCalledWith({
+      userId: user.id,
+      sessionId: session.id,
+      reportJobId: queued.jobId,
+    });
 
     const reports = await reportStore.listReportOverviews(user.id);
     const progressSessions = await progressStore.listProgressSessions(user.id);
@@ -128,7 +146,7 @@ describe("demo runtime", () => {
 
     expect(reports).toHaveLength(1);
     expect(progressSessions).toHaveLength(1);
-    expect(progressSessions[0]?.score).toBe(firstGeneration.report.scorecard.overallScore);
+    expect(progressSessions[0]?.score).toBe(reports[0]?.scorecard.overallScore);
     expect(progressSessions[0]?.followUps).toBe(2);
     expect(snapshotAfter.activeMode).toBe("system-design");
     expect(snapshotAfter.recentSessionCount).toBe(1);
