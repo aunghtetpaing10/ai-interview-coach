@@ -9,7 +9,7 @@ import {
 import { requireWorkspaceUser } from "@/lib/auth/session";
 import { buildDashboardReadModel } from "@/lib/dashboard/read-model";
 import { createProgressService } from "@/lib/progress-service/progress-service";
-import { createReportService } from "@/lib/report-service/report-service";
+import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
 import { CandidateShell } from "@/components/workspace/candidate-shell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -59,18 +59,51 @@ export default async function DashboardPage() {
     reportService.listReportOverviews(user.id),
     progressService.getProgressSnapshot(user.id),
   ]);
+  const completedSessions = sessions.filter((session) => session.status === "completed");
+  const latestCompletedSession = completedSessions[0] ?? null;
 
   const latestReport = reportOverviews[0]
     ? await reportService.getReportById(user.id, reportOverviews[0].id)
+    : null;
+  const latestReportWorkflow = latestCompletedSession
+    ? await reportService
+        .getReportGenerationState(user.id, latestCompletedSession.id)
+        .catch((error) => {
+          if (
+            error instanceof ReportServiceError &&
+            (error.code === "not_found" || error.code === "invalid_state")
+          ) {
+            return null;
+          }
+
+          throw error;
+        })
     : null;
   const model = buildDashboardReadModel({
     workspace,
     reportOverviews,
     latestReport,
+    reportWorkflow: latestReportWorkflow
+      ? {
+          sessionId: latestCompletedSession!.id,
+          status: latestReportWorkflow.status,
+          reportId: latestReportWorkflow.reportId,
+          error: latestReportWorkflow.error,
+        }
+      : null,
     progressSnapshot,
-    completedSessionCount: sessions.filter((session) => session.status === "completed").length,
+    completedSessionCount: completedSessions.length,
   });
-  const latestReportHref = model.latestReport ? `/reports/${model.latestReport.id}` : "/reports";
+  const latestReportHref = model.reportWorkflow
+    ? model.reportWorkflow.href
+    : model.latestReport
+      ? `/reports/${model.latestReport.id}`
+      : "/reports";
+  const latestReportLabel = model.reportWorkflow
+    ? model.reportWorkflow.label
+    : model.latestReport
+      ? "Open latest report"
+      : "View reports";
   const candidateLabel = workspace.profile?.fullName ?? user.email ?? "Candidate";
 
   return (
@@ -123,7 +156,7 @@ export default async function DashboardPage() {
                         }),
                       )}
                     >
-                      {model.latestReport ? "Open latest report" : "View reports"}
+                      {latestReportLabel}
                     </Link>
                   </div>
                 </div>
@@ -179,12 +212,20 @@ export default async function DashboardPage() {
                   <div className="mt-3 flex items-end justify-between gap-4">
                     <div>
                       <p className="text-3xl font-semibold tracking-[-0.05em] text-[#122033]">
-                        {model.latestReport?.score ?? "--"}
+                        {model.reportWorkflow
+                          ? model.reportWorkflow.status === "failed"
+                            ? "!"
+                            : "..."
+                          : model.latestReport?.score ?? "--"}
                       </p>
                       <p className="mt-1 text-sm text-slate-600">
-                        {model.latestReport
-                          ? `${model.latestReport.band} band`
-                          : "No completed report yet"}
+                        {model.reportWorkflow
+                          ? model.reportWorkflow.status === "failed"
+                            ? "Latest report failed"
+                            : "Latest report processing"
+                          : model.latestReport
+                            ? `${model.latestReport.band} band`
+                            : "No completed report yet"}
                       </p>
                     </div>
                     <Link
@@ -196,12 +237,14 @@ export default async function DashboardPage() {
                         }),
                       )}
                     >
-                      Review
+                      {model.reportWorkflow ? "Track" : "Review"}
                     </Link>
                   </div>
                 </div>
                 <div className="rounded-[24px] border border-dashed border-[#1b3958]/15 bg-white/60 p-4 text-sm leading-6 text-slate-600">
-                  {model.latestSession
+                  {model.reportWorkflow
+                    ? model.reportWorkflow.description
+                    : model.latestSession
                     ? `${model.latestSession.trackLabel} on ${model.latestSession.completedAtLabel} ran ${model.latestSession.durationMinutes} minutes with ${model.latestSession.followUps} follow-up prompts.`
                     : "The session summary will appear here after the first completed interview."}
                 </div>
@@ -398,9 +441,9 @@ export default async function DashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {model.timeline.length > 0 ? (
-                    model.timeline.map((point) => (
+                    model.timeline.map((point, index) => (
                       <div
-                        key={`${point.label}-${point.trackLabel}`}
+                        key={`${point.label}-${point.trackLabel}-${index}`}
                         className="flex items-center justify-between rounded-[22px] border border-[#1b3958]/10 bg-white/75 px-4 py-3"
                       >
                         <div>

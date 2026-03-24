@@ -59,7 +59,7 @@ export function buildInterviewSessionStateFromView(input: {
     activePrompt: lastInterviewerTurn?.body ?? fallbackPrompt,
     connectionMessage:
       input.view.session.status === "completed"
-        ? "Session complete. Review the stored transcript and queued report."
+        ? "Session complete. Review the stored transcript and track the background report."
         : "Persisted session loaded. Start live voice or continue in text fallback.",
   };
 }

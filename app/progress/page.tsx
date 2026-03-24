@@ -10,9 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPostHogTelemetryStatus } from "@/lib/analytics/posthog";
 import { getSentryTelemetryStatus } from "@/lib/observability/sentry";
 import { createProgressService } from "@/lib/progress-service/progress-service";
+import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
 import { getRateLimitTelemetryStatus } from "@/lib/rate-limit/upstash";
 import { cn } from "@/lib/utils";
-import { createWorkspaceProgressStore } from "@/lib/workspace/runtime";
+import {
+  createWorkspaceProgressStore,
+  createWorkspaceReportStore,
+} from "@/lib/workspace/runtime";
 
 export const metadata: Metadata = {
   title: "Progress",
@@ -25,10 +29,26 @@ export const dynamic = "force-dynamic";
 export default async function ProgressPage() {
   const user = await requireWorkspaceUser("/progress");
   const progressService = createProgressService(await createWorkspaceProgressStore());
+  const reportService = createReportService(await createWorkspaceReportStore());
   const [sessions, snapshot] = await Promise.all([
     progressService.listProgressSessions(user.id),
     progressService.getProgressSnapshot(user.id),
   ]);
+  const latestCompletedSessionId = sessions[0]?.id ?? null;
+  const latestReportWorkflow = latestCompletedSessionId
+    ? await reportService
+        .getReportGenerationState(user.id, latestCompletedSessionId)
+        .catch((error) => {
+          if (
+            error instanceof ReportServiceError &&
+            (error.code === "not_found" || error.code === "invalid_state")
+          ) {
+            return null;
+          }
+
+          throw error;
+        })
+    : null;
   const posthog = getPostHogTelemetryStatus();
   const sentry = getSentryTelemetryStatus();
   const rateLimit = getRateLimitTelemetryStatus();
@@ -97,6 +117,43 @@ export default async function ProgressPage() {
       headline="Track score movement, telemetry health, and how often deliberate practice is actually happening."
       railNote="Progress keeps its existing analytics behavior; this pass only moves it into the signed-in Curator shell."
     >
+      {latestReportWorkflow &&
+        latestReportWorkflow.status !== "completed" &&
+        latestCompletedSessionId && (
+          <Card className="mb-6 border-[#1638d4]/10 bg-white/90 shadow-[0_24px_90px_-50px_rgba(15,23,42,0.45)]">
+            <CardHeader className="space-y-3">
+              <Badge className="w-fit rounded-full bg-[#1638d4] px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-white">
+                Report workflow
+              </Badge>
+              <CardTitle className="text-2xl tracking-[-0.04em] text-slate-950">
+                {latestReportWorkflow.status === "failed"
+                  ? "The latest report job failed."
+                  : "The latest report is still processing."}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm leading-7 text-slate-600">
+              <p>
+                {latestReportWorkflow.status === "failed"
+                  ? latestReportWorkflow.error ??
+                    "Retry the background job to publish the newest scorecard."
+                  : "This completed session is already reflected in progress history while the background report job finishes."}
+              </p>
+              <Link
+                href={`/reports/processing/${latestCompletedSessionId}`}
+                className={cn(
+                  buttonVariants({
+                    className: "rounded-full bg-slate-950 text-white hover:bg-slate-800",
+                  }),
+                )}
+              >
+                {latestReportWorkflow.status === "failed"
+                  ? "Retry report"
+                  : "Track report status"}
+                <ArrowRight className="size-4" />
+              </Link>
+            </CardContent>
+          </Card>
+        )}
       <ProgressDashboard
         snapshot={snapshot}
         posthog={posthog}

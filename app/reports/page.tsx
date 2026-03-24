@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, FileText, Sparkles } from "lucide-react";
 import { requireWorkspaceUser } from "@/lib/auth/session";
-import { createReportService } from "@/lib/report-service/report-service";
+import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
 import { CandidateShell } from "@/components/workspace/candidate-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -14,18 +14,44 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { createWorkspaceReportStore } from "@/lib/workspace/runtime";
+import {
+  createWorkspaceInterviewRepository,
+  createWorkspaceReportStore,
+} from "@/lib/workspace/runtime";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
   const user = await requireWorkspaceUser("/reports");
+  const repository = await createWorkspaceInterviewRepository();
   const reportService = createReportService(await createWorkspaceReportStore());
-  const reportOverviews = await reportService.listReportOverviews(user.id);
+  const [reportOverviews, sessions] = await Promise.all([
+    reportService.listReportOverviews(user.id),
+    repository.listWorkspaceSessions(user.id),
+  ]);
   const latestReport = reportOverviews[0];
+  const latestCompletedSession = sessions.find((session) => session.status === "completed") ?? null;
+  const reportWorkflow = latestCompletedSession
+    ? await reportService
+        .getReportGenerationState(user.id, latestCompletedSession.id)
+        .catch((error) => {
+          if (
+            error instanceof ReportServiceError &&
+            (error.code === "not_found" || error.code === "invalid_state")
+          ) {
+            return null;
+          }
+
+          throw error;
+        })
+    : null;
   const userLabel = user.email ?? "Candidate";
 
-  if (latestReport) {
+  if (reportWorkflow?.status === "completed" && reportWorkflow.reportId) {
+    redirect(`/reports/${reportWorkflow.reportId}`);
+  }
+
+  if (!reportWorkflow && latestReport) {
     redirect(`/reports/${latestReport.id}`);
   }
 
@@ -34,7 +60,11 @@ export default async function ReportsPage() {
       activeHref="/reports"
       userLabel={userLabel}
       headline="Review stored scorecards, transcript evidence, answer rewrites, and the next deliberate practice plan."
-      railNote="`/reports` now opens the latest completed report by default when one exists."
+      railNote={
+        reportWorkflow
+          ? "The latest report job is tracked from here until it resolves into a stable report detail route."
+          : "`/reports` now opens the latest completed report by default when one exists."
+      }
     >
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
         <Card className="curator-card-dark overflow-hidden">
@@ -48,12 +78,19 @@ export default async function ReportsPage() {
               </span>
             </div>
             <CardTitle className="curator-display text-5xl text-white sm:text-6xl">
-              No completed reports yet.
+              {reportWorkflow
+                ? reportWorkflow.status === "failed"
+                  ? "Latest report failed."
+                  : "Latest report is processing."
+                : "No completed reports yet."}
             </CardTitle>
             <CardDescription className="max-w-2xl text-base leading-7 text-slate-200">
-              Finish an interview and queue report generation. The latest report
-              will become the default `/reports` destination, while older reports
-              remain directly addressable from their own URLs.
+              {reportWorkflow
+                ? reportWorkflow.status === "failed"
+                  ? reportWorkflow.error ??
+                    "The latest interview completed, but the background report job failed. Retry it from the processing route."
+                  : "The latest interview completed and the report is still running in the background. Stay here or open the processing route to watch it finish."
+                : "Finish an interview and queue report generation. The latest report will become the default `/reports` destination, while older reports remain directly addressable from their own URLs."}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 p-6 md:grid-cols-2">
@@ -62,9 +99,19 @@ export default async function ReportsPage() {
                 What appears here
               </p>
               <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-                <p>Stored scorecards anchored to persisted transcript evidence.</p>
-                <p>Rewrite recommendations that convert weak answers into tighter versions.</p>
-                <p>Practice steps that carry into the next interview round.</p>
+                {reportWorkflow ? (
+                  <>
+                    <p>The latest report status is tied to the completed session, not a placeholder redirect.</p>
+                    <p>Queued and running jobs stay visible while Inngest finishes the background work.</p>
+                    <p>Failed jobs expose a retry path instead of leaving `/reports` blank.</p>
+                  </>
+                ) : (
+                  <>
+                    <p>Stored scorecards anchored to persisted transcript evidence.</p>
+                    <p>Rewrite recommendations that convert weak answers into tighter versions.</p>
+                    <p>Practice steps that carry into the next interview round.</p>
+                  </>
+                )}
               </div>
             </div>
             <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-5">
@@ -72,8 +119,11 @@ export default async function ReportsPage() {
                 Recommended next move
               </p>
               <p className="mt-4 text-sm leading-7 text-slate-300">
-                Finish onboarding if the profile is still incomplete, then run a
-                live interview to seed the first report row.
+                {reportWorkflow
+                  ? reportWorkflow.status === "failed"
+                    ? "Open the processing page, retry the job, and wait for the report to publish."
+                    : "Open the processing page to watch the job complete, then continue into the stored report."
+                  : "Finish onboarding if the profile is still incomplete, then run a live interview to seed the first report row."}
               </p>
             </div>
           </CardContent>
@@ -93,8 +143,9 @@ export default async function ReportsPage() {
               <div className="flex items-start gap-3">
                 <FileText className="mt-0.5 size-4 text-[color:var(--curator-navy)]" />
                 <p>
-                  When a report exists, the index route redirects straight to the
-                  latest detail page instead of forcing a catalog-first workflow.
+                  {reportWorkflow
+                    ? "When the latest job is pending or failed, the index route stays on workflow status instead of redirecting to stale content."
+                    : "When a report exists, the index route redirects straight to the latest detail page instead of forcing a catalog-first workflow."}
                 </p>
               </div>
             </div>
@@ -109,7 +160,11 @@ export default async function ReportsPage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/interview"
+                href={
+                  reportWorkflow && latestCompletedSession
+                    ? `/reports/processing/${latestCompletedSession.id}`
+                    : "/interview"
+                }
                 className={cn(
                   buttonVariants({
                     className:
@@ -117,7 +172,7 @@ export default async function ReportsPage() {
                   }),
                 )}
               >
-                Start interview
+                {reportWorkflow ? "Open processing" : "Start interview"}
                 <ArrowRight className="size-4" />
               </Link>
               <Link
