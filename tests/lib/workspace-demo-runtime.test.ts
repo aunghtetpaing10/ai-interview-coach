@@ -179,17 +179,31 @@ describe("workspace demo runtime", () => {
     });
 
     const reportService = createReportService(demoRuntime.createDemoReportStore());
-    const created = await reportService.generateAndStoreReport(user.id, session.session.id);
-    const updated = await reportService.generateAndStoreReport(user.id, session.session.id);
+    const queued = await createReportService(demoRuntime.createDemoReportStore(), {
+      backgroundProcessingAvailable: true,
+      publishReportGenerationRequestedEvent: vi.fn().mockResolvedValue(undefined),
+    }).requestReportGeneration(user.id, session.session.id);
+    const completed = await reportService.processQueuedReportGeneration({
+      userId: user.id,
+      sessionId: session.session.id,
+      reportJobId: queued.jobId,
+      attemptCount: 1,
+      maxAttempts: 3,
+    });
+    const updated = await createReportService(demoRuntime.createDemoReportStore(), {
+      backgroundProcessingAvailable: true,
+      publishReportGenerationRequestedEvent: vi.fn().mockResolvedValue(undefined),
+    }).requestReportGeneration(user.id, session.session.id);
     const overviews = await reportService.listReportOverviews(user.id);
-    const report = await reportService.getReportById(user.id, created.report.id);
+    const report = await reportService.getReportById(user.id, completed?.reportId ?? "");
     const progressService = createProgressService(demoRuntime.createDemoProgressStore());
     const progressSessions = await progressService.listProgressSessions(user.id);
     const progressSnapshot = await progressService.getProgressSnapshot(user.id);
 
-    expect(created.status).toBe("created");
-    expect(updated.status).toBe("updated");
-    expect(updated.report.id).toBe(created.report.id);
+    expect(queued.status).toBe("queued");
+    expect(completed?.status).toBe("completed");
+    expect(updated.status).toBe("completed");
+    expect(updated.reportId).toBe(completed?.reportId);
     expect(overviews).toHaveLength(1);
     expect(report?.practicePlan.steps.length).toBeGreaterThan(0);
     expect(progressSessions).toHaveLength(1);

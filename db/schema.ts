@@ -30,6 +30,7 @@ export type RubricKey =
 export type SessionStatus = "draft" | "active" | "paused" | "completed" | "archived";
 export type TranscriptSpeaker = "interviewer" | "candidate";
 export type ScoreBand = "training" | "improving" | "ready";
+export type ReportGenerationStatus = "queued" | "running" | "completed" | "failed";
 
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -239,6 +240,41 @@ export const practicePlans = pgTable(
   ],
 );
 
+export const reportGenerationJobs = pgTable(
+  "report_generation_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => interviewSessions.id, { onDelete: "cascade" })
+      .unique(),
+    userId: uuid("user_id").notNull(),
+    status: text("status").$type<ReportGenerationStatus>().notNull().default("queued"),
+    reportId: uuid("report_id").references(() => feedbackReports.id, {
+      onDelete: "set null",
+    }),
+    errorMessage: text("error_message"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    queuedAt: timestamp("queued_at", { withTimezone: true }).defaultNow().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("report_generation_jobs_user_id_updated_at_idx").on(
+      table.userId,
+      table.updatedAt.desc(),
+    ),
+    index("report_generation_jobs_status_idx").on(table.status),
+    check(
+      "report_generation_jobs_status_check",
+      sql`${table.status} in ('queued', 'running', 'completed', 'failed')`,
+    ),
+    check("report_generation_jobs_attempt_count_check", sql`${table.attemptCount} >= 0`),
+  ],
+);
+
 export const promptVersions = pgTable("prompt_versions", {
   id: uuid("id").primaryKey().defaultRandom(),
   label: text("label").notNull(),
@@ -267,6 +303,7 @@ export type InterviewSessionRow = InferSelectModel<typeof interviewSessions>;
 export type TranscriptTurnRow = InferSelectModel<typeof transcriptTurns>;
 export type FeedbackReportRow = InferSelectModel<typeof feedbackReports>;
 export type PracticePlanRow = InferSelectModel<typeof practicePlans>;
+export type ReportGenerationJobRow = InferSelectModel<typeof reportGenerationJobs>;
 export type PromptVersionRow = InferSelectModel<typeof promptVersions>;
 export type EvalCaseRow = InferSelectModel<typeof evalCases>;
 
@@ -280,5 +317,6 @@ export type NewInterviewSessionRow = InferInsertModel<typeof interviewSessions>;
 export type NewTranscriptTurnRow = InferInsertModel<typeof transcriptTurns>;
 export type NewFeedbackReportRow = InferInsertModel<typeof feedbackReports>;
 export type NewPracticePlanRow = InferInsertModel<typeof practicePlans>;
+export type NewReportGenerationJobRow = InferInsertModel<typeof reportGenerationJobs>;
 export type NewPromptVersionRow = InferInsertModel<typeof promptVersions>;
 export type NewEvalCaseRow = InferInsertModel<typeof evalCases>;

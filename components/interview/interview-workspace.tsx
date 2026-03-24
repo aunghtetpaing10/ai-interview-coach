@@ -216,12 +216,19 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
 
       const reportResult = await reportResponse.json().catch(() => null);
 
-      if (!reportResult?.reportId) {
-        throw new Error("Session saved, but the report response was invalid.");
+      if (reportResult?.status === "completed" && reportResult.reportId) {
+        setRuntimeNotice("Report ready. Opening the latest report.");
+        router.push(`/reports/${reportResult.reportId}`);
+        return;
       }
 
-      setRuntimeNotice("Report ready. Opening the latest report.");
-      router.push(`/reports/${reportResult.reportId}`);
+      if (reportResult?.status === "queued" || reportResult?.status === "running") {
+        setRuntimeNotice("Report is processing. Opening the job tracker.");
+        router.push(`/reports/processing/${state.sessionId}`);
+        return;
+      }
+
+      throw new Error("Session saved, but the report response was invalid.");
     } catch (error) {
       setRuntimeNotice(
         error instanceof Error
@@ -308,8 +315,8 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
             </CardTitle>
             <p className="max-w-3xl text-base leading-7 text-slate-300">
               The Curator keeps the browser realtime connection, text fallback,
-              transcript persistence, and report queueing in a single editorial
-              rehearsal loop.
+              transcript persistence, and background report publishing in a single
+              editorial rehearsal loop.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -540,7 +547,8 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
             <p className="text-sm leading-6 text-slate-600">
               This shell negotiates a real OpenAI Realtime transport in the
               browser and keeps the text fallback path available when voice
-              setup is unavailable.
+              setup is unavailable while the report publishes in the background
+              after the session ends.
             </p>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-slate-700">

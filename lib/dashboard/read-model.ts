@@ -22,12 +22,27 @@ type DashboardPracticeStep = {
   length: string;
 };
 
+export interface DashboardReportWorkflow {
+  sessionId: string;
+  status: "queued" | "running" | "completed" | "failed";
+  reportId?: string;
+  error?: string;
+}
+
 export interface DashboardReadModel {
   firstName: string;
   headline: string;
   targetRole: string;
   activeModeLabel: string;
   heroDescription: string;
+  reportWorkflow: {
+    sessionId: string;
+    href: string;
+    label: string;
+    description: string;
+    status: DashboardReportWorkflow["status"];
+    error?: string;
+  } | null;
   stats: Array<{
     label: string;
     value: string;
@@ -132,6 +147,7 @@ export function buildDashboardReadModel(input: {
   workspace: WorkspaceSnapshot;
   reportOverviews: readonly ReportOverview[];
   latestReport: InterviewReport | null;
+  reportWorkflow?: DashboardReportWorkflow | null;
   progressSnapshot: ProgressDashboardSnapshot | null;
   completedSessionCount: number;
 }): DashboardReadModel {
@@ -148,15 +164,38 @@ export function buildDashboardReadModel(input: {
   const weakestTrack = input.progressSnapshot?.weakestTrack.label ?? "system design";
   const strongestTrack = input.progressSnapshot?.strongestTrack.label ?? "project walkthrough";
   const latestReport = input.latestReport;
+  const reportWorkflow =
+    input.reportWorkflow && input.reportWorkflow.status !== "completed"
+      ? {
+          sessionId: input.reportWorkflow.sessionId,
+          href: `/reports/processing/${input.reportWorkflow.sessionId}`,
+          label:
+            input.reportWorkflow.status === "failed"
+              ? "Retry report"
+              : "Track report status",
+          description:
+            input.reportWorkflow.status === "failed"
+              ? input.reportWorkflow.error ??
+                "The latest report job failed. Retry it from the processing page."
+              : "The latest completed session is still processing in the background.",
+          status: input.reportWorkflow.status,
+          error: input.reportWorkflow.error,
+        }
+      : null;
 
   return {
     firstName,
     headline: input.workspace.profile?.headline ?? "Interview practice dashboard",
     activeModeLabel: getInterviewModeLabel(input.workspace.activeMode),
     targetRole,
-    heroDescription: latestReport
+    heroDescription: reportWorkflow
+      ? reportWorkflow.status === "failed"
+        ? "The latest interview finished, but report generation failed. Re-run the job to publish a fresh scorecard and practice plan."
+        : "The latest interview finished and the report is processing in the background. Keep the dashboard open or follow the processing page for completion."
+      : latestReport
       ? `${strongestTrack} is currently your strongest track, while ${weakestTrack.toLowerCase()} still needs a tighter explanation of constraints and tradeoffs.`
       : "Save onboarding data, complete your first interview, and the dashboard will replace these placeholders with persisted score trends and a practice plan.",
+    reportWorkflow,
     stats: [
       {
         label: "Readiness band",
@@ -177,7 +216,11 @@ export function buildDashboardReadModel(input: {
       {
         label: "Reports generated",
         value: String(input.reportOverviews.length),
-        copy: input.reportOverviews.length > 0
+        copy: reportWorkflow
+          ? reportWorkflow.status === "failed"
+            ? "The latest report failed and needs a retry before the newest session can be reviewed."
+            : "A background report job is still processing the newest completed session."
+          : input.reportOverviews.length > 0
           ? "Each report is stored and can be reopened from the latest feedback surface."
           : "Reports are generated asynchronously after a session completes.",
         icon: "report",
@@ -192,10 +235,16 @@ export function buildDashboardReadModel(input: {
       },
     ],
     nextDrillTitle:
-      latestReport?.practicePlan.steps[0]?.title ??
+      reportWorkflow
+        ? reportWorkflow.status === "failed"
+          ? "Recover the failed report run"
+          : "Wait for the latest report"
+        : latestReport?.practicePlan.steps[0]?.title ??
       `Start a ${input.workspace.activeMode.replace("-", " ")} session`,
     nextDrillDescription:
-      latestReport?.practicePlan.steps[0]
+      reportWorkflow
+        ? reportWorkflow.description
+        : latestReport?.practicePlan.steps[0]
         ? `${latestReport.practicePlan.steps[0].drill} ${latestReport.practicePlan.steps[0].outcome}`.trim()
         : "Use the interview room to create the first persisted transcript and report.",
     latestSession: input.progressSnapshot

@@ -68,11 +68,11 @@ export default async function InterviewPage({
               </span>
             </div>
             <h1 className="curator-display max-w-4xl text-5xl text-[color:var(--curator-ink)] sm:text-6xl">
-              Keep the rehearsal grounded in transcript evidence and queued follow-through.
+              Keep the rehearsal grounded in transcript evidence and background follow-through.
             </h1>
             <p className="max-w-2xl text-base leading-7 text-slate-700">
               The interview room needs a target role and saved profile context
-              before the live transcript, voice transport, and report queueing
+              before the live transcript, voice transport, and report processing
               can stay tied to real candidate data.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -194,7 +194,7 @@ export default async function InterviewPage({
           </h1>
           <p className="max-w-2xl text-base leading-7 text-slate-700">
             The Curator keeps a timed interview loop, transcript evidence,
-            and report queueing in the same workspace so the whole rehearsal
+            and background report publishing in the same workspace so the whole rehearsal
             reads like a deliberate production workflow.
           </p>
         </div>
@@ -213,8 +213,8 @@ export default async function InterviewPage({
               </div>
             </div>
             <CardDescription className="text-base leading-7 text-slate-600">
-              The live room keeps transcript turns, transport state, and report
-              queueing in one deterministic loop.
+              The live room keeps transcript turns, transport state, and
+              background report publishing in one deterministic loop.
             </CardDescription>
           </CardHeader>
         </Card>

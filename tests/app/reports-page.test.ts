@@ -1,14 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
 
 const {
   requireWorkspaceUserMock,
+  createWorkspaceInterviewRepositoryMock,
   createWorkspaceReportStoreMock,
   createReportServiceMock,
   redirectMock,
 } = vi.hoisted(() => ({
   requireWorkspaceUserMock: vi.fn(),
+  createWorkspaceInterviewRepositoryMock: vi.fn(),
   createWorkspaceReportStoreMock: vi.fn(),
   createReportServiceMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
@@ -27,12 +29,20 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 vi.mock("@/lib/workspace/runtime", () => ({
+  createWorkspaceInterviewRepository: createWorkspaceInterviewRepositoryMock,
   createWorkspaceReportStore: createWorkspaceReportStoreMock,
 }));
 
-vi.mock("@/lib/report-service/report-service", () => ({
-  createReportService: createReportServiceMock,
-}));
+vi.mock("@/lib/report-service/report-service", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/report-service/report-service")>(
+    "@/lib/report-service/report-service",
+  );
+
+  return {
+    ...actual,
+    createReportService: createReportServiceMock,
+  };
+});
 
 vi.mock("next/navigation", async () => {
   const actual = await vi.importActual<typeof import("next/navigation")>(
@@ -55,7 +65,7 @@ function makeReportOverview(): ReportOverview {
     sessionDate: "March 19, 2026",
     candidate: "Aung Htet Paing",
     targetRole: "Platform engineer",
-    promptVersion: "report-rubric-v1",
+    promptVersion: "Scorecard v1",
     scorecard: {
       mode: "project",
       overallScore: 84,
@@ -117,23 +127,107 @@ describe("reports pages", () => {
     source: "demo" as const,
   };
 
+  const repository = {
+    listWorkspaceSessions: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("loads the latest report detail from the reports index route", async () => {
     requireWorkspaceUserMock.mockResolvedValue(user);
+    createWorkspaceInterviewRepositoryMock.mockResolvedValue(repository);
     createWorkspaceReportStoreMock.mockReturnValue({});
+    repository.listWorkspaceSessions.mockResolvedValue([]);
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([makeReportOverview()]),
+      getReportGenerationState: vi.fn(),
     });
 
     await expect(ReportsPage()).rejects.toThrow("REDIRECT:/reports/report-1");
     expect(redirectMock).toHaveBeenCalledWith("/reports/report-1");
   });
 
-  it("renders a coherent empty state when there are no reports", async () => {
+  it("renders a workflow-aware pending state when the latest report is still processing", async () => {
     requireWorkspaceUserMock.mockResolvedValue(user);
+    createWorkspaceInterviewRepositoryMock.mockResolvedValue(repository);
     createWorkspaceReportStoreMock.mockReturnValue({});
+    repository.listWorkspaceSessions.mockResolvedValue([
+      {
+        id: "session-1",
+        userId: user.id,
+        targetRoleId: "target-1",
+        mode: "project",
+        status: "completed",
+        title: "Queue scaling drill",
+        overallScore: 84,
+        durationSeconds: 1080,
+        startedAt: new Date("2026-03-19T10:00:00.000Z"),
+        endedAt: new Date("2026-03-19T10:18:00.000Z"),
+        createdAt: new Date("2026-03-19T09:59:00.000Z"),
+        updatedAt: new Date("2026-03-19T10:18:00.000Z"),
+      },
+    ]);
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([]),
       getReportById: vi.fn(),
+      getReportGenerationState: vi.fn().mockResolvedValue({
+        jobId: "job-1",
+        status: "running",
+      }),
+    });
+
+    const html = renderToStaticMarkup(await ReportsPage());
+
+    expect(html).toContain("Latest report is processing.");
+    expect(html).toContain("Open processing");
+    expect(html).toContain("/reports/processing/session-1");
+  });
+
+  it("redirects to the completed report when the workflow is done but the overview list is stale", async () => {
+    requireWorkspaceUserMock.mockResolvedValue(user);
+    createWorkspaceInterviewRepositoryMock.mockResolvedValue(repository);
+    createWorkspaceReportStoreMock.mockReturnValue({});
+    repository.listWorkspaceSessions.mockResolvedValue([
+      {
+        id: "session-1",
+        userId: user.id,
+        targetRoleId: "target-1",
+        mode: "project",
+        status: "completed",
+        title: "Queue scaling drill",
+        overallScore: 84,
+        durationSeconds: 1080,
+        startedAt: new Date("2026-03-19T10:00:00.000Z"),
+        endedAt: new Date("2026-03-19T10:18:00.000Z"),
+        createdAt: new Date("2026-03-19T09:59:00.000Z"),
+        updatedAt: new Date("2026-03-19T10:18:00.000Z"),
+      },
+    ]);
+    createReportServiceMock.mockReturnValue({
+      listReportOverviews: vi.fn().mockResolvedValue([]),
+      getReportById: vi.fn(),
+      getReportGenerationState: vi.fn().mockResolvedValue({
+        jobId: "job-1",
+        status: "completed",
+        reportId: "report-1",
+      }),
+    });
+
+    await expect(ReportsPage()).rejects.toThrow("REDIRECT:/reports/report-1");
+    expect(redirectMock).toHaveBeenCalledWith("/reports/report-1");
+  });
+
+  it("renders a coherent empty state when there are no reports or workflows", async () => {
+    requireWorkspaceUserMock.mockResolvedValue(user);
+    createWorkspaceInterviewRepositoryMock.mockResolvedValue(repository);
+    createWorkspaceReportStoreMock.mockReturnValue({});
+    repository.listWorkspaceSessions.mockResolvedValue([]);
+    createReportServiceMock.mockReturnValue({
+      listReportOverviews: vi.fn().mockResolvedValue([]),
+      getReportById: vi.fn(),
+      getReportGenerationState: vi.fn(),
     });
 
     const html = renderToStaticMarkup(await ReportsPage());
