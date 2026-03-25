@@ -1,11 +1,11 @@
 import "server-only";
 
 import type { FeedbackReportRow, PracticePlanRow, ReportGenerationJobRow } from "@/db/schema";
-import type { ReportGenerationContext, ReportStore } from "@/lib/report-service/report-service";
+import type { ReportGenerationContext, ReportJobStore, ReportStore } from "@/lib/report-service/report-service";
 import type { ReportOverview } from "@/lib/reporting/types";
 import { clone, demoRuntime, DEMO_PROMPT_VERSION, DEMO_USER } from "./state";
 
-export function createDemoReportStore(): ReportStore {
+export function createDemoReportStore(): ReportStore & ReportJobStore {
   return {
     listReportOverviews: async (userId: string) => {
       const state = demoRuntime.readState();

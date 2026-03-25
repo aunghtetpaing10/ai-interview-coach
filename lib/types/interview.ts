@@ -1,9 +1,5 @@
-export type InterviewMode =
-  | "behavioral"
-  | "resume"
-  | "project"
-  | "system-design";
-
+import type { InterviewMode } from "@/db/schema";
+export type { InterviewMode };
 export type CompetencyKey =
   | "clarity"
   | "ownership"
