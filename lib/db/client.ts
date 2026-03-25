@@ -20,10 +20,13 @@ function createSqlClient() {
     throw new Error("POSTGRES_URL is required for product routes.");
   }
 
-  return postgres(env.POSTGRES_URL, {
-    prepare: false,
-  });
-}
+    return postgres(env.POSTGRES_URL, {
+      prepare: false,
+      max: process.env.DB_MAX_CONNECTIONS ? parseInt(process.env.DB_MAX_CONNECTIONS, 10) : 10,
+      idle_timeout: 20,
+      connect_timeout: 10,
+    });
+  }
 
 export function getSqlClient() {
   if (!globalThis.__interviewCoachSql) {
