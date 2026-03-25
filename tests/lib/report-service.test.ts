@@ -375,7 +375,6 @@ describe("report service", () => {
   });
 
   it("returns a completed report state when the report already exists", async () => {
-    const completedJob = makeJob("completed");
     const store = {
       listReportOverviews: vi.fn(),
       getReportById: vi.fn(),
@@ -399,7 +398,7 @@ describe("report service", () => {
       getReportGenerationJobBySessionId: vi.fn(),
       enqueueReportGenerationJob: vi.fn(),
       claimReportGenerationJob: vi.fn(),
-      completeReportGenerationJob: vi.fn().mockResolvedValue(completedJob),
+      completeReportGenerationJob: vi.fn(),
       failReportGenerationJob: vi.fn(),
     };
 
@@ -410,16 +409,13 @@ describe("report service", () => {
     const result = await service.requestReportGeneration("user_1", "session-123");
 
     expect(result).toEqual({
-      jobId: completedJob.id,
+      jobId: "report-123",
       status: "completed",
       reportId: "report-123",
       error: undefined,
     });
-    expect(store.completeReportGenerationJob).toHaveBeenCalledWith(
-      "user_1",
-      "session-123",
-      "report-123",
-    );
+    expect(store.getReportGenerationJobBySessionId).not.toHaveBeenCalled();
+    expect(store.completeReportGenerationJob).not.toHaveBeenCalled();
   });
 
   it("throws a 503 when background processing is unavailable", async () => {
@@ -466,6 +462,47 @@ describe("report service", () => {
       reportId: undefined,
       error: undefined,
     });
+  });
+
+  it("derives a completed report state without mutating jobs when a report already exists", async () => {
+    const store = {
+      listReportOverviews: vi.fn(),
+      getReportById: vi.fn(),
+      loadGenerationContext: vi.fn().mockResolvedValue(
+        makeGenerationContext({
+          report: {
+            id: "report-123",
+            sessionId: "session-123",
+            promptVersionId: "prompt-1",
+            summary: scorecardSummary.headline,
+            scorecard: reportOverview.scorecard,
+            strengths: scorecardSummary.strengths,
+            gaps: scorecardSummary.growthAreas,
+            citations: [],
+            rewrites: [],
+            createdAt: new Date("2026-03-19T10:18:00.000Z"),
+          },
+        }),
+      ),
+      saveGeneratedReport: vi.fn(),
+      getReportGenerationJobBySessionId: vi.fn(),
+      enqueueReportGenerationJob: vi.fn(),
+      claimReportGenerationJob: vi.fn(),
+      completeReportGenerationJob: vi.fn(),
+      failReportGenerationJob: vi.fn(),
+    };
+
+    const service = createReportService(store);
+    const result = await service.getReportGenerationState("user_1", "session-123");
+
+    expect(result).toEqual({
+      jobId: "report-123",
+      status: "completed",
+      reportId: "report-123",
+      error: undefined,
+    });
+    expect(store.getReportGenerationJobBySessionId).not.toHaveBeenCalled();
+    expect(store.completeReportGenerationJob).not.toHaveBeenCalled();
   });
 
   it("processes a claimed queued job into a completed report", async () => {

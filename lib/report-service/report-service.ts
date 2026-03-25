@@ -187,6 +187,15 @@ function toReportGenerationState(job: ReportGenerationJobRow): ReportGenerationS
   };
 }
 
+function toCompletedReportGenerationState(reportId: string): ReportGenerationState {
+  return {
+    jobId: reportId,
+    status: "completed",
+    reportId,
+    error: undefined,
+  };
+}
+
 function requireJobStore(store: ReportStore) {
   if (
     !store.getReportGenerationJobBySessionId ||
@@ -268,20 +277,14 @@ export function createReportService(
         );
       }
 
-      const jobStore = getJobStore();
-
       if (context.report) {
-        const completedJob = await jobStore.completeReportGenerationJob(
-          userId,
-          sessionId,
-          context.report.id,
-        );
-        return toReportGenerationState(completedJob);
+        return toCompletedReportGenerationState(context.report.id);
       }
 
-      const job = await jobStore.getReportGenerationJobBySessionId(userId, sessionId);
+      const jobStore = getJobStore();
+      const existingJob = await jobStore.getReportGenerationJobBySessionId(userId, sessionId);
 
-      if (!job) {
+      if (!existingJob) {
         throw new ReportServiceError(
           "Report generation has not been queued for this session.",
           "not_found",
@@ -289,7 +292,7 @@ export function createReportService(
         );
       }
 
-      return toReportGenerationState(job);
+      return toReportGenerationState(existingJob);
     },
 
     async requestReportGeneration(
@@ -308,16 +311,12 @@ export function createReportService(
         );
       }
 
-      const jobStore = getJobStore();
-
       if (context.report) {
-        const completedJob = await jobStore.completeReportGenerationJob(
-          userId,
-          sessionId,
-          context.report.id,
-        );
-        return toReportGenerationState(completedJob);
+        return toCompletedReportGenerationState(context.report.id);
       }
+
+      const jobStore = getJobStore();
+      const existingJob = await jobStore.getReportGenerationJobBySessionId(userId, sessionId);
 
       if (
         !options.backgroundProcessingAvailable ||
@@ -329,8 +328,6 @@ export function createReportService(
           503,
         );
       }
-
-      const existingJob = await jobStore.getReportGenerationJobBySessionId(userId, sessionId);
 
       if (existingJob?.status === "running") {
         return toReportGenerationState(existingJob);
