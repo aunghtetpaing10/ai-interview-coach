@@ -45,26 +45,29 @@ export interface ReportStore {
     context: ReportGenerationContext,
     report: InterviewReport,
   ): Promise<InterviewReport>;
-  getReportGenerationJobBySessionId?(
+}
+
+export interface ReportJobStore {
+  getReportGenerationJobBySessionId(
     userId: string,
     sessionId: string,
   ): Promise<ReportGenerationJobRow | null>;
-  enqueueReportGenerationJob?(
+  enqueueReportGenerationJob(
     userId: string,
     sessionId: string,
   ): Promise<ReportGenerationJobRow>;
-  claimReportGenerationJob?(input: {
+  claimReportGenerationJob(input: {
     userId: string;
     sessionId: string;
     reportJobId?: string;
     attemptCount: number;
   }): Promise<ReportGenerationJobRow | null>;
-  completeReportGenerationJob?(
+  completeReportGenerationJob(
     userId: string,
     sessionId: string,
     reportId: string,
   ): Promise<ReportGenerationJobRow>;
-  failReportGenerationJob?(
+  failReportGenerationJob(
     userId: string,
     sessionId: string,
     errorMessage: string,
@@ -117,6 +120,7 @@ export class ReportServiceError extends Error {
 
 export interface ReportServiceOptions {
   evaluator?: ReportEvaluator;
+  jobStore?: ReportJobStore;
   publishReportGenerationRequestedEvent?: (
     payload: ReportGenerationEventPayload,
   ) => Promise<void>;
@@ -196,24 +200,23 @@ function toCompletedReportGenerationState(reportId: string): ReportGenerationSta
   };
 }
 
-function requireJobStore(store: ReportStore) {
+function requireJobStore(store: ReportStore | (ReportStore & ReportJobStore), options?: ReportServiceOptions): ReportJobStore {
+  if (options?.jobStore) {
+    return options.jobStore;
+  }
+
+  const maybeJobStore = store as Partial<ReportJobStore>;
   if (
-    !store.getReportGenerationJobBySessionId ||
-    !store.enqueueReportGenerationJob ||
-    !store.claimReportGenerationJob ||
-    !store.completeReportGenerationJob ||
-    !store.failReportGenerationJob
+    !maybeJobStore.getReportGenerationJobBySessionId ||
+    !maybeJobStore.enqueueReportGenerationJob ||
+    !maybeJobStore.claimReportGenerationJob ||
+    !maybeJobStore.completeReportGenerationJob ||
+    !maybeJobStore.failReportGenerationJob
   ) {
     throw new Error("Report job store methods are not configured.");
   }
 
-  return {
-    getReportGenerationJobBySessionId: store.getReportGenerationJobBySessionId,
-    enqueueReportGenerationJob: store.enqueueReportGenerationJob,
-    claimReportGenerationJob: store.claimReportGenerationJob,
-    completeReportGenerationJob: store.completeReportGenerationJob,
-    failReportGenerationJob: store.failReportGenerationJob,
-  };
+  return maybeJobStore as ReportJobStore;
 }
 
 export function createReportService(
@@ -221,7 +224,7 @@ export function createReportService(
   options: ReportServiceOptions = {},
 ) {
   let evaluator: ReportEvaluator | null = options.evaluator ?? null;
-  const getJobStore = () => requireJobStore(store);
+  const getJobStore = () => requireJobStore(store, options);
   const getEvaluator = () => {
     evaluator ??= createReportEvaluatorForRuntime();
     return evaluator;

@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { landingHighlights, stackHighlights } from "@/lib/mock-data";
+import { landingHighlights, stackHighlights } from "@/lib/fixtures/mock-data";
 import { cn } from "@/lib/utils";
 
 const proofPoints = [

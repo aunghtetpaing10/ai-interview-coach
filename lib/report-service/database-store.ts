@@ -24,7 +24,7 @@ import {
 import { getDb } from "@/lib/db/client";
 import { generatePracticePlan, summarizeScorecard } from "@/lib/reporting/reporting";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
-import type { ReportGenerationContext, ReportStore } from "@/lib/report-service/report-service";
+import type { ReportGenerationContext, ReportJobStore, ReportStore } from "@/lib/report-service/report-service";
 import type { TranscriptTurn } from "@/lib/types/interview";
 
 type DbMutationClient = Pick<ReturnType<typeof getDb>, "select" | "insert" | "update">;
@@ -140,7 +140,7 @@ async function lockReportGenerationJobRow(
   return job ?? null;
 }
 
-export function createPostgresReportStore(): ReportStore {
+export function createPostgresReportStore(): ReportStore & ReportJobStore {
   const db = getDb();
 
   return {
