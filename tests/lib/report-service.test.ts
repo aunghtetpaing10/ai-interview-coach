@@ -375,7 +375,6 @@ describe("report service", () => {
   });
 
   it("returns a completed report state when the report already exists", async () => {
-    const completedJob = makeJob("completed");
     const store = {
       listReportOverviews: vi.fn(),
       getReportById: vi.fn(),
@@ -396,10 +395,10 @@ describe("report service", () => {
         }),
       ),
       saveGeneratedReport: vi.fn(),
-      getReportGenerationJobBySessionId: vi.fn().mockResolvedValue(completedJob),
+      getReportGenerationJobBySessionId: vi.fn(),
       enqueueReportGenerationJob: vi.fn(),
       claimReportGenerationJob: vi.fn(),
-      completeReportGenerationJob: vi.fn().mockResolvedValue(completedJob),
+      completeReportGenerationJob: vi.fn(),
       failReportGenerationJob: vi.fn(),
     };
 
@@ -410,15 +409,12 @@ describe("report service", () => {
     const result = await service.requestReportGeneration("user_1", "session-123");
 
     expect(result).toEqual({
-      jobId: completedJob.id,
+      jobId: "report-123",
       status: "completed",
       reportId: "report-123",
       error: undefined,
     });
-    expect(store.getReportGenerationJobBySessionId).toHaveBeenCalledWith(
-      "user_1",
-      "session-123",
-    );
+    expect(store.getReportGenerationJobBySessionId).not.toHaveBeenCalled();
     expect(store.completeReportGenerationJob).not.toHaveBeenCalled();
   });
 
@@ -489,7 +485,7 @@ describe("report service", () => {
         }),
       ),
       saveGeneratedReport: vi.fn(),
-      getReportGenerationJobBySessionId: vi.fn().mockResolvedValue(null),
+      getReportGenerationJobBySessionId: vi.fn(),
       enqueueReportGenerationJob: vi.fn(),
       claimReportGenerationJob: vi.fn(),
       completeReportGenerationJob: vi.fn(),
@@ -505,10 +501,7 @@ describe("report service", () => {
       reportId: "report-123",
       error: undefined,
     });
-    expect(store.getReportGenerationJobBySessionId).toHaveBeenCalledWith(
-      "user_1",
-      "session-123",
-    );
+    expect(store.getReportGenerationJobBySessionId).not.toHaveBeenCalled();
     expect(store.completeReportGenerationJob).not.toHaveBeenCalled();
   });
 

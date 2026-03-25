@@ -187,12 +187,9 @@ function toReportGenerationState(job: ReportGenerationJobRow): ReportGenerationS
   };
 }
 
-function toCompletedReportGenerationState(
-  reportId: string,
-  job: ReportGenerationJobRow | null,
-): ReportGenerationState {
+function toCompletedReportGenerationState(reportId: string): ReportGenerationState {
   return {
-    jobId: job?.id ?? reportId,
+    jobId: reportId,
     status: "completed",
     reportId,
     error: undefined,
@@ -280,12 +277,12 @@ export function createReportService(
         );
       }
 
+      if (context.report) {
+        return toCompletedReportGenerationState(context.report.id);
+      }
+
       const jobStore = getJobStore();
       const existingJob = await jobStore.getReportGenerationJobBySessionId(userId, sessionId);
-
-      if (context.report) {
-        return toCompletedReportGenerationState(context.report.id, existingJob);
-      }
 
       if (!existingJob) {
         throw new ReportServiceError(
@@ -314,12 +311,12 @@ export function createReportService(
         );
       }
 
+      if (context.report) {
+        return toCompletedReportGenerationState(context.report.id);
+      }
+
       const jobStore = getJobStore();
       const existingJob = await jobStore.getReportGenerationJobBySessionId(userId, sessionId);
-
-      if (context.report) {
-        return toCompletedReportGenerationState(context.report.id, existingJob);
-      }
 
       if (
         !options.backgroundProcessingAvailable ||
