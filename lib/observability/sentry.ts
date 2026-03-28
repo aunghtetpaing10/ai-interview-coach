@@ -16,9 +16,16 @@ export interface ObservabilityBridge {
   flush(timeoutMs?: number): Promise<boolean>;
 }
 
-function readSentrySettings(env: Record<string, string | undefined>) {
-  const dsn = env.SENTRY_DSN ?? null;
-  const environment = env.SENTRY_ENVIRONMENT ?? env.NODE_ENV ?? "development";
+interface SentrySettings {
+  dsn: string | null;
+  environment: string;
+  tracesSampleRate: number;
+}
+
+function readSentrySettings(env: Record<string, string | undefined>): SentrySettings {
+  const dsn = env.SENTRY_DSN ?? env.NEXT_PUBLIC_SENTRY_DSN ?? null;
+  const environment =
+    env.SENTRY_ENVIRONMENT ?? env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ?? env.NODE_ENV ?? "development";
   const tracesSampleRate = Number(env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1");
 
   return {
@@ -40,10 +47,27 @@ export function getSentryTelemetryStatus(
     label: enabled ? "Error capture ready" : "Error capture disabled",
     detail: enabled
       ? `Tracing is configured for ${settings.environment}.`
-      : "Set SENTRY_DSN to enable exception capture and tracing.",
-    nextStep: enabled ? "Ready for release monitoring" : "Connect a DSN to turn on alerts",
+      : "Set SENTRY_DSN or NEXT_PUBLIC_SENTRY_DSN to enable exception capture and tracing.",
+    nextStep: enabled
+      ? "Ready for release monitoring"
+      : "Connect SENTRY_DSN or NEXT_PUBLIC_SENTRY_DSN to turn on alerts",
     environment: settings.environment,
   };
+}
+
+let browserBridgeInitialized = false;
+
+function initializeBrowserBridge(settings: SentrySettings) {
+  if (browserBridgeInitialized || typeof window === "undefined" || !settings.dsn) {
+    return;
+  }
+
+  browserBridgeInitialized = true;
+  Sentry.init({
+    dsn: settings.dsn,
+    environment: settings.environment,
+    tracesSampleRate: settings.tracesSampleRate,
+  });
 }
 
 export function createSentryBridge(
@@ -60,11 +84,15 @@ export function createSentryBridge(
     };
   }
 
-  Sentry.init({
-    dsn: settings.dsn,
-    environment: settings.environment,
-    tracesSampleRate: settings.tracesSampleRate,
-  });
+  if (typeof window === "undefined") {
+    Sentry.init({
+      dsn: settings.dsn,
+      environment: settings.environment,
+      tracesSampleRate: settings.tracesSampleRate,
+    });
+  } else {
+    initializeBrowserBridge(settings);
+  }
 
   return {
     enabled: true,
@@ -87,4 +115,26 @@ export function createSentryBridge(
       }
     },
   };
+}
+
+export function captureClientException(
+  error: unknown,
+  context?: Record<string, unknown>,
+): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const settings = readSentrySettings(process.env);
+
+  if (!settings.dsn) {
+    return false;
+  }
+
+  initializeBrowserBridge(settings);
+  Sentry.captureException(error, {
+    extra: context,
+  });
+
+  return true;
 }

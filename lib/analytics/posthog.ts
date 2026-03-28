@@ -45,7 +45,9 @@ export function getPostHogTelemetryStatus(
     detail: enabled
       ? `Events will stream to ${settings.host}.`
       : "Set POSTHOG_KEY or NEXT_PUBLIC_POSTHOG_KEY to enable event capture.",
-    nextStep: enabled ? "Ready for session analytics" : "Connect a key to turn on product analytics",
+    nextStep: enabled
+      ? "Ready for session analytics"
+      : "Connect POSTHOG_KEY or NEXT_PUBLIC_POSTHOG_KEY to turn on product analytics",
     host: settings.host,
   };
 }
