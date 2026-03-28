@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { getWorkspaceUser } from "@/lib/auth/session";
-import { getEnv, isE2EDemoMode, isReportJobRuntimeConfigured } from "@/lib/env";
-import { enqueueReportGenerationRequestedEvent } from "@/lib/inngest/report-generation";
-import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
-import { createWorkspaceReportStore } from "@/lib/workspace/runtime";
+import {
+  GET as getReportGenerationWorkflow,
+  POST as postReportGenerationWorkflow,
+} from "../report-generation/route";
 
 type RouteContext = {
   params: Promise<{
@@ -11,66 +10,61 @@ type RouteContext = {
   }>;
 };
 
-function isBackgroundProcessingAvailable() {
-  if (isE2EDemoMode() || getEnv().NODE_ENV === "test") {
-    return true;
-  }
+async function unwrapWorkflowResponse(response: NextResponse<unknown>) {
+  const payload = await response.json().catch(() => null);
+  const body = (() => {
+    if (payload && typeof payload === "object") {
+      if ("data" in payload) {
+        const data = (payload as { data: unknown }).data;
+        if (data && typeof data === "object" && "status" in data) {
+          const workflow = data as {
+            status: string;
+            job?: { id?: string | null } | null;
+            report?: { id?: string | null } | null;
+            failure?: { message?: string | null } | null;
+          };
+          const reportId = workflow.report?.id ?? undefined;
 
-  return isReportJobRuntimeConfigured();
-}
+          return {
+            jobId:
+              workflow.job?.id ??
+              (workflow.status === "completed" ? reportId : undefined),
+            status: workflow.status,
+            reportId,
+            error: workflow.failure?.message ?? undefined,
+          };
+        }
 
-function toErrorResponse(error: unknown) {
-  if (error instanceof ReportServiceError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.status },
-    );
-  }
+        return data;
+      }
 
-  throw error;
-}
+      if ("error" in payload) {
+        const errorPayload = (payload as { error?: { code?: string; message?: string } })
+          .error;
+        if (errorPayload && typeof errorPayload === "object") {
+          return {
+            error: errorPayload.message ?? "Request failed.",
+            code: errorPayload.code ?? "error",
+          };
+        }
+      }
+    }
 
-export async function GET(_request: Request, context: RouteContext) {
-  const user = await getWorkspaceUser();
+    return payload;
+  })();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
-
-  const { sessionId } = await context.params;
-  const reportService = createReportService(await createWorkspaceReportStore());
-
-  try {
-    const result = await reportService.getReportGenerationState(user.id, sessionId);
-
-    return NextResponse.json(result, { status: 200 });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
-}
-
-export async function POST(_request: Request, context: RouteContext) {
-  const user = await getWorkspaceUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
-
-  const { sessionId } = await context.params;
-  const reportService = createReportService(await createWorkspaceReportStore(), {
-    backgroundProcessingAvailable: isBackgroundProcessingAvailable(),
-    publishReportGenerationRequestedEvent: async (payload) => {
-      await enqueueReportGenerationRequestedEvent(payload);
-    },
+  return NextResponse.json(body, {
+    status: response.status,
+    headers: response.headers,
   });
+}
 
-  try {
-    const result = await reportService.requestReportGeneration(user.id, sessionId);
+export async function GET(request: Request, context: RouteContext) {
+  const response = await getReportGenerationWorkflow(request, context);
+  return unwrapWorkflowResponse(response);
+}
 
-    return NextResponse.json(result, {
-      status: result.status === "completed" ? 200 : 202,
-    });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
+export async function POST(request: Request, context: RouteContext) {
+  const response = await postReportGenerationWorkflow(request, context);
+  return unwrapWorkflowResponse(response);
 }

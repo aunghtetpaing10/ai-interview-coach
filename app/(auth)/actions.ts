@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   buildAuthActionState,
@@ -9,10 +10,19 @@ import {
 } from "@/lib/auth/forms";
 import { revalidateProtectedPaths } from "@/lib/auth/cache";
 import { resolvePostAuthDestination } from "@/lib/auth/destination";
+import { evaluateRateLimit, getForwardedIp } from "@/lib/rate-limit/upstash";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getFieldErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong.";
+}
+
+async function getRequestHeadersForRateLimit() {
+  try {
+    return await headers();
+  } catch {
+    return null;
+  }
 }
 
 export async function signInAction(
@@ -26,6 +36,17 @@ export async function signInAction(
       "error",
       "Check the fields and try again.",
       parsed.error.flatten().fieldErrors,
+    );
+  }
+  const requestHeaders = await getRequestHeadersForRateLimit();
+  const rateLimitEvaluation = await evaluateRateLimit("sign_in", {
+    ip: requestHeaders ? getForwardedIp(requestHeaders) : null,
+    account: parsed.data.email.toLowerCase(),
+  });
+  if (!rateLimitEvaluation.success && rateLimitEvaluation.enforced) {
+    return buildAuthActionState(
+      "error",
+      `Too many sign-in attempts. Try again in ${rateLimitEvaluation.retryAfterSeconds} seconds.`,
     );
   }
 
@@ -70,6 +91,17 @@ export async function signUpAction(
       "error",
       "Check the fields and try again.",
       parsed.error.flatten().fieldErrors,
+    );
+  }
+  const requestHeaders = await getRequestHeadersForRateLimit();
+  const rateLimitEvaluation = await evaluateRateLimit("sign_up", {
+    ip: requestHeaders ? getForwardedIp(requestHeaders) : null,
+    account: parsed.data.email.toLowerCase(),
+  });
+  if (!rateLimitEvaluation.success && rateLimitEvaluation.enforced) {
+    return buildAuthActionState(
+      "error",
+      `Too many sign-up attempts. Try again in ${rateLimitEvaluation.retryAfterSeconds} seconds.`,
     );
   }
 

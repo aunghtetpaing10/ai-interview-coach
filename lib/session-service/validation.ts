@@ -27,6 +27,8 @@ export const appendTranscriptTurnSchema = z.object({
 });
 
 export const appendTranscriptTurnsRequestSchema = z.object({
+  batchId: z.string().trim().min(1).optional(),
+  baseSequenceIndex: z.number().int().nonnegative().optional(),
   turns: z.array(appendTranscriptTurnSchema).min(1),
 });
 

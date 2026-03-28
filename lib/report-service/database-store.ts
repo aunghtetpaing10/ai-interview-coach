@@ -7,6 +7,7 @@ import type {
   NewReportGenerationJobRow,
   ProfileRow,
   PromptVersionRow,
+  ReportArtifactEnvelope,
   TargetRoleRow,
   TranscriptTurnRow,
 } from "@/db/schema";
@@ -53,6 +54,22 @@ function mapOverview(row: {
   targetRole: TargetRoleRow;
   promptVersion: PromptVersionRow | null;
 }): ReportOverview {
+  const canonicalReport = getCanonicalReportArtifact(row.report);
+  if (canonicalReport) {
+    return {
+      id: row.report.id,
+      title: canonicalReport.title,
+      sessionDate: canonicalReport.sessionDate,
+      candidate: canonicalReport.candidate,
+      targetRole: canonicalReport.targetRole,
+      promptVersion: canonicalReport.promptVersion,
+      scorecard: canonicalReport.scorecard,
+      summary: canonicalReport.summary,
+      strengths: [...canonicalReport.strengths],
+      growthAreas: [...canonicalReport.growthAreas],
+    };
+  }
+
   const summary = summarizeScorecard(row.report.scorecard);
 
   return {
@@ -77,6 +94,21 @@ function mapReportDetail(row: {
   promptVersion: PromptVersionRow | null;
   transcript: readonly TranscriptTurnRow[];
 }): InterviewReport {
+  const canonicalReport = getCanonicalReportArtifact(row.report);
+  if (canonicalReport) {
+    return {
+      ...canonicalReport,
+      id: row.report.id,
+      transcript:
+        canonicalReport.transcript.length > 0
+          ? canonicalReport.transcript
+          : toTranscriptTurns(row.transcript),
+      citations: [...canonicalReport.citations],
+      rewrites: [...canonicalReport.rewrites],
+      practicePlan: canonicalReport.practicePlan,
+    };
+  }
+
   const overview = mapOverview(row);
   const transcript = toTranscriptTurns(row.transcript);
   const report: InterviewReport = {
@@ -93,6 +125,30 @@ function mapReportDetail(row: {
   };
 
   return report;
+}
+
+function getCanonicalReportArtifact(row: FeedbackReportRow): InterviewReport | null {
+  const artifact = row.artifact;
+
+  if (!artifact || typeof artifact !== "object") {
+    return null;
+  }
+
+  const candidate = artifact as Partial<ReportArtifactEnvelope>;
+  if (!candidate.report || typeof candidate.report !== "object") {
+    return null;
+  }
+
+  return candidate.report;
+}
+
+function toReportArtifactEnvelope(report: InterviewReport): ReportArtifactEnvelope {
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    source: "runtime",
+    report,
+  };
 }
 
 function buildQueuedReportGenerationJobRow(
@@ -306,6 +362,7 @@ export function createPostgresReportStore(): ReportStore & ReportJobStore {
             gaps: [...report.growthAreas],
             citations: [...report.citations],
             rewrites: [...report.rewrites],
+            artifact: toReportArtifactEnvelope(report),
           })
           .onConflictDoUpdate({
             target: feedbackReports.sessionId,
@@ -317,6 +374,7 @@ export function createPostgresReportStore(): ReportStore & ReportJobStore {
               gaps: [...report.growthAreas],
               citations: [...report.citations],
               rewrites: [...report.rewrites],
+              artifact: toReportArtifactEnvelope(report),
             },
           });
 

@@ -11,7 +11,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { sql, type InferInsertModel, type InferSelectModel } from "drizzle-orm";
-import type { AnswerRewrite, CitationBlock } from "@/lib/reporting/types";
+import type {
+  AnswerRewrite,
+  CitationBlock,
+  InterviewReport,
+} from "@/lib/reporting/types";
 import type { Scorecard } from "@/lib/types/interview";
 
 export type InterviewMode =
@@ -31,6 +35,13 @@ export type SessionStatus = "draft" | "active" | "paused" | "completed" | "archi
 export type TranscriptSpeaker = "interviewer" | "candidate";
 export type ScoreBand = "training" | "improving" | "ready";
 export type ReportGenerationStatus = "queued" | "running" | "completed" | "failed";
+export type ReportArtifactEnvelope = {
+  schemaVersion: number;
+  generatedAt: string;
+  source: "runtime" | "backfill";
+  reconstructed?: boolean;
+  report: InterviewReport;
+};
 
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -128,6 +139,9 @@ export const interviewSessions = pgTable(
     title: text("title").notNull(),
     overallScore: integer("overall_score"),
     durationSeconds: integer("duration_seconds").notNull().default(18 * 60),
+    nextTranscriptSequenceIndex: integer("next_transcript_sequence_index")
+      .notNull()
+      .default(0),
     startedAt: timestamp("started_at", { withTimezone: true }),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -150,6 +164,10 @@ export const interviewSessions = pgTable(
     check(
       "interview_sessions_duration_seconds_check",
       sql`${table.durationSeconds} >= 0`,
+    ),
+    check(
+      "interview_sessions_next_transcript_sequence_index_check",
+      sql`${table.nextTranscriptSequenceIndex} >= 0`,
     ),
     check(
       "interview_sessions_overall_score_check",
@@ -189,6 +207,37 @@ export const transcriptTurns = pgTable(
   ],
 );
 
+export const transcriptAppendBatches = pgTable(
+  "transcript_append_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => interviewSessions.id, { onDelete: "cascade" }),
+    batchId: text("batch_id").notNull(),
+    requestHash: text("request_hash").notNull(),
+    turnCount: integer("turn_count").notNull(),
+    firstSequenceIndex: integer("first_sequence_index").notNull(),
+    lastSequenceIndex: integer("last_sequence_index").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("transcript_append_batches_session_id_batch_id_idx").on(
+      table.sessionId,
+      table.batchId,
+    ),
+    index("transcript_append_batches_session_id_created_at_idx").on(
+      table.sessionId,
+      table.createdAt.desc(),
+    ),
+    check("transcript_append_batches_turn_count_check", sql`${table.turnCount} > 0`),
+    check(
+      "transcript_append_batches_sequence_range_check",
+      sql`${table.firstSequenceIndex} <= ${table.lastSequenceIndex}`,
+    ),
+  ],
+);
+
 export const feedbackReports = pgTable(
   "feedback_reports",
   {
@@ -205,6 +254,7 @@ export const feedbackReports = pgTable(
     gaps: jsonb("gaps").$type<readonly string[]>(),
     citations: jsonb("citations").$type<readonly CitationBlock[]>(),
     rewrites: jsonb("rewrites").$type<readonly AnswerRewrite[]>(),
+    artifact: jsonb("artifact").$type<ReportArtifactEnvelope>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -299,9 +349,19 @@ export type ResumeAssetRow = InferSelectModel<typeof resumeAssets>;
 export type JobTargetRow = InferSelectModel<typeof jobTargets>;
 export type RubricDimensionRow = InferSelectModel<typeof rubricDimensions>;
 export type QuestionBankRow = InferSelectModel<typeof questionBank>;
-export type InterviewSessionRow = InferSelectModel<typeof interviewSessions>;
+type InterviewSessionRowBase = InferSelectModel<typeof interviewSessions>;
+export type InterviewSessionRow = Omit<
+  InterviewSessionRowBase,
+  "nextTranscriptSequenceIndex"
+> & {
+  nextTranscriptSequenceIndex?: number;
+};
 export type TranscriptTurnRow = InferSelectModel<typeof transcriptTurns>;
-export type FeedbackReportRow = InferSelectModel<typeof feedbackReports>;
+export type TranscriptAppendBatchRow = InferSelectModel<typeof transcriptAppendBatches>;
+type FeedbackReportRowBase = InferSelectModel<typeof feedbackReports>;
+export type FeedbackReportRow = Omit<FeedbackReportRowBase, "artifact"> & {
+  artifact?: ReportArtifactEnvelope | null;
+};
 export type PracticePlanRow = InferSelectModel<typeof practicePlans>;
 export type ReportGenerationJobRow = InferSelectModel<typeof reportGenerationJobs>;
 export type PromptVersionRow = InferSelectModel<typeof promptVersions>;
@@ -315,6 +375,7 @@ export type NewRubricDimensionRow = InferInsertModel<typeof rubricDimensions>;
 export type NewQuestionBankRow = InferInsertModel<typeof questionBank>;
 export type NewInterviewSessionRow = InferInsertModel<typeof interviewSessions>;
 export type NewTranscriptTurnRow = InferInsertModel<typeof transcriptTurns>;
+export type NewTranscriptAppendBatchRow = InferInsertModel<typeof transcriptAppendBatches>;
 export type NewFeedbackReportRow = InferInsertModel<typeof feedbackReports>;
 export type NewPracticePlanRow = InferInsertModel<typeof practicePlans>;
 export type NewReportGenerationJobRow = InferInsertModel<typeof reportGenerationJobs>;

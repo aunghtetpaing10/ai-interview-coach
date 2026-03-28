@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, LoaderCircle, RefreshCcw } from "lucide-react";
-import type { ReportGenerationState } from "@/lib/report-service/report-service";
+import type { ReportGenerationWorkflow } from "@/lib/report-service/report-service";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +11,43 @@ import { cn } from "@/lib/utils";
 
 type ReportProcessingPanelProps = {
   sessionId: string;
-  initialState: ReportGenerationState;
+  initialState: ReportGenerationWorkflow;
 };
 
-function getStatusLabel(status: ReportGenerationState["status"]) {
+function toLegacyWorkflow(value: unknown): ReportGenerationWorkflow {
+  if (value && typeof value === "object" && "status" in value) {
+    const candidate = value as {
+      status: ReportGenerationWorkflow["status"];
+      job?: { id?: string | null } | null;
+      report?: { id?: string | null } | null;
+      failure?: { message?: string | null } | null;
+      jobId?: string;
+      reportId?: string;
+      error?: string;
+    };
+    if ("job" in candidate || "report" in candidate || "failure" in candidate) {
+      return {
+        status: candidate.status,
+        jobId:
+          candidate.job?.id ??
+          (candidate.status === "completed" ? candidate.report?.id ?? undefined : undefined),
+        reportId: candidate.report?.id ?? undefined,
+        error: candidate.failure?.message ?? undefined,
+      };
+    }
+
+    return candidate;
+  }
+
+  return {
+    status: "not_requested",
+  };
+}
+
+function getStatusLabel(status: ReportGenerationWorkflow["status"]) {
   switch (status) {
+    case "not_requested":
+      return "Not requested";
     case "queued":
       return "Queued";
     case "running":
@@ -27,14 +59,19 @@ function getStatusLabel(status: ReportGenerationState["status"]) {
   }
 }
 
-function getStatusDescription(state: ReportGenerationState) {
+function getStatusDescription(state: ReportGenerationWorkflow) {
   switch (state.status) {
+    case "not_requested":
+      return "The report has not been requested yet.";
     case "queued":
       return "The interview has been saved and the background report job is waiting to start.";
     case "running":
       return "The report is being generated in the background. This page will redirect as soon as it is ready.";
     case "failed":
-      return state.error ?? "The report job failed. Retry it to generate the latest scorecard.";
+      return (
+        state.error ??
+        "The report job failed. Retry it to generate the latest scorecard."
+      );
     case "completed":
       return "The report is ready. Redirecting now.";
   }
@@ -45,7 +82,7 @@ export function ReportProcessingPanel({
   initialState,
 }: ReportProcessingPanelProps) {
   const router = useRouter();
-  const [state, setState] = useState(initialState);
+  const [state, setState] = useState(() => toLegacyWorkflow(initialState));
   const [pollError, setPollError] = useState<string | null>(null);
   const [isRetryPending, startRetryTransition] = useTransition();
 
@@ -66,16 +103,20 @@ export function ReportProcessingPanel({
 
     const pollStatus = async () => {
       try {
-        const response = await fetch(`/api/interview/sessions/${sessionId}/report`, {
+        const response = await fetch(`/api/interview/sessions/${sessionId}/report-generation`, {
           method: "GET",
           cache: "no-store",
         });
 
         if (!response.ok) {
-          throw new Error("Failed to refresh report status.");
+          const payload = await response.json().catch(() => null);
+          throw new Error(
+            payload?.error?.message ?? "Failed to refresh report status.",
+          );
         }
 
-        const nextState = (await response.json()) as ReportGenerationState;
+        const payload = await response.json().catch(() => null);
+        const nextState = toLegacyWorkflow(payload?.data ?? payload);
 
         if (cancelled) {
           return;
@@ -110,15 +151,19 @@ export function ReportProcessingPanel({
   function handleRetry() {
     startRetryTransition(async () => {
       try {
-        const response = await fetch(`/api/interview/sessions/${sessionId}/report`, {
+        const response = await fetch(`/api/interview/sessions/${sessionId}/report-generation`, {
           method: "POST",
         });
 
         if (!response.ok) {
-          throw new Error("Failed to retry report generation.");
+          const payload = await response.json().catch(() => null);
+          throw new Error(
+            payload?.error?.message ?? "Failed to retry report generation.",
+          );
         }
 
-        const nextState = (await response.json()) as ReportGenerationState;
+        const payload = await response.json().catch(() => null);
+        const nextState = toLegacyWorkflow(payload?.data ?? payload);
         setState(nextState);
         setPollError(null);
       } catch (error) {
@@ -147,7 +192,9 @@ export function ReportProcessingPanel({
         <CardTitle className="text-3xl tracking-[-0.05em] text-[color:var(--curator-ink)]">
           {state.status === "failed"
             ? "The background job needs a retry."
-            : "The latest interview report is in flight."}
+            : state.status === "not_requested"
+              ? "Queue report generation to begin background processing."
+              : "The latest interview report is in flight."}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm leading-7 text-slate-600">

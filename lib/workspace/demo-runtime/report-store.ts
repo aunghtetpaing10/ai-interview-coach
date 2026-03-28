@@ -1,9 +1,23 @@
 import "server-only";
 
-import type { FeedbackReportRow, PracticePlanRow, ReportGenerationJobRow } from "@/db/schema";
+import type {
+  FeedbackReportRow,
+  PracticePlanRow,
+  ReportArtifactEnvelope,
+  ReportGenerationJobRow,
+} from "@/db/schema";
 import type { ReportGenerationContext, ReportJobStore, ReportStore } from "@/lib/report-service/report-service";
-import type { ReportOverview } from "@/lib/reporting/types";
+import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
 import { clone, demoRuntime, DEMO_PROMPT_VERSION, DEMO_USER } from "./state";
+
+function toReportArtifactEnvelope(report: InterviewReport): ReportArtifactEnvelope {
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    source: "runtime",
+    report,
+  };
+}
 
 export function createDemoReportStore(): ReportStore & ReportJobStore {
   return {
@@ -109,6 +123,7 @@ export function createDemoReportStore(): ReportStore & ReportJobStore {
         gaps: [...report.growthAreas],
         citations: [...report.citations],
         rewrites: [...report.rewrites],
+        artifact: toReportArtifactEnvelope(clone(report)),
         createdAt,
       };
       const practicePlan: PracticePlanRow = {

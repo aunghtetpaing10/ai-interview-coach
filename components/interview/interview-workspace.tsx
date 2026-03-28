@@ -50,6 +50,9 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
   const [state, dispatch] = useReducer(interviewSessionReducer, initialSession);
   const [runtimeNotice, setRuntimeNotice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const persistedNextSequenceIndexRef = useRef(
+    initialSession.transcript.filter((turn) => turn.speaker !== "system").length,
+  );
   const connectionRef = useRef<{
     close(): void;
     sendText(text: string): void;
@@ -214,11 +217,14 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
         throw new Error("Session saved, but the report could not be created.");
       }
 
-      const reportResult = await reportResponse.json().catch(() => null);
+      const reportPayload = await reportResponse.json().catch(() => null);
+      const reportResult = reportPayload?.data ?? reportPayload;
+      const completedReportId =
+        reportResult?.report?.id ?? reportResult?.reportId ?? null;
 
-      if (reportResult?.status === "completed" && reportResult.reportId) {
+      if (reportResult?.status === "completed" && completedReportId) {
         setRuntimeNotice("Report ready. Opening the latest report.");
-        router.push(`/reports/${reportResult.reportId}`);
+        router.push(`/reports/${completedReportId}`);
         return;
       }
 
@@ -269,18 +275,33 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     dispatch({ type: "response-submitted" });
 
     try {
+      const batchId = crypto.randomUUID();
+      const baseSequenceIndex = persistedNextSequenceIndexRef.current;
       const response = await fetch(`/api/interview/sessions/${state.sessionId}/turns`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
+          batchId,
+          baseSequenceIndex,
           turns: appendedTurns,
         }),
       });
 
       if (!response.ok) {
-        throw new Error("The transcript updated locally, but the server could not persist the new turns.");
+        const payload = await response.json().catch(() => null);
+        const message =
+          payload?.error?.message ??
+          "The transcript updated locally, but the server could not persist the new turns.";
+
+        throw new Error(message);
+      }
+
+      const payload = await response.json().catch(() => null);
+      const appendAck = payload?.data ?? payload;
+      if (typeof appendAck?.nextSequenceIndex === "number") {
+        persistedNextSequenceIndexRef.current = appendAck.nextSequenceIndex;
       }
     } catch (error) {
       setRuntimeNotice(

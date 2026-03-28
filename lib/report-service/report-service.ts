@@ -92,9 +92,11 @@ export interface ReportGenerationEventPayload {
   reportJobId?: string;
 }
 
-export interface ReportGenerationState {
-  jobId: string;
-  status: ReportGenerationStatus;
+export type ReportGenerationWorkflowStatus = ReportGenerationStatus | "not_requested";
+
+export interface ReportGenerationWorkflow {
+  status: ReportGenerationWorkflowStatus;
+  jobId?: string;
   reportId?: string;
   error?: string;
 }
@@ -182,25 +184,38 @@ function getErrorMessage(error: unknown) {
   return "Report generation failed.";
 }
 
-function toReportGenerationState(job: ReportGenerationJobRow): ReportGenerationState {
+function toNotRequestedReportGenerationWorkflow(): ReportGenerationWorkflow {
   return {
-    jobId: job.id,
+    status: "not_requested",
+  };
+}
+
+function toReportGenerationWorkflow(
+  job: ReportGenerationJobRow,
+): ReportGenerationWorkflow {
+  return {
     status: job.status,
+    jobId: job.id,
     reportId: job.reportId ?? undefined,
     error: job.errorMessage ?? undefined,
   };
 }
 
-function toCompletedReportGenerationState(reportId: string): ReportGenerationState {
+function toCompletedReportGenerationWorkflow(
+  reportId: string,
+): ReportGenerationWorkflow {
   return {
-    jobId: reportId,
     status: "completed",
+    jobId: reportId,
     reportId,
     error: undefined,
   };
 }
 
-function requireJobStore(store: ReportStore | (ReportStore & ReportJobStore), options?: ReportServiceOptions): ReportJobStore {
+function requireJobStore(
+  store: ReportStore | (ReportStore & ReportJobStore),
+  options?: ReportServiceOptions,
+): ReportJobStore {
   if (options?.jobStore) {
     return options.jobStore;
   }
@@ -267,7 +282,7 @@ export function createReportService(
     async getReportGenerationState(
       userId: string,
       sessionId: string,
-    ): Promise<ReportGenerationState> {
+    ): Promise<ReportGenerationWorkflow> {
       const context = await store.loadGenerationContext(userId, sessionId);
 
       if (!context) {
@@ -281,27 +296,23 @@ export function createReportService(
       }
 
       if (context.report) {
-        return toCompletedReportGenerationState(context.report.id);
+        return toCompletedReportGenerationWorkflow(context.report.id);
       }
 
       const jobStore = getJobStore();
       const existingJob = await jobStore.getReportGenerationJobBySessionId(userId, sessionId);
 
       if (!existingJob) {
-        throw new ReportServiceError(
-          "Report generation has not been queued for this session.",
-          "not_found",
-          404,
-        );
+        return toNotRequestedReportGenerationWorkflow();
       }
 
-      return toReportGenerationState(existingJob);
+      return toReportGenerationWorkflow(existingJob);
     },
 
     async requestReportGeneration(
       userId: string,
       sessionId: string,
-    ): Promise<ReportGenerationState> {
+    ): Promise<ReportGenerationWorkflow> {
       const context = await store.loadGenerationContext(userId, sessionId);
 
       if (!context) {
@@ -315,7 +326,7 @@ export function createReportService(
       }
 
       if (context.report) {
-        return toCompletedReportGenerationState(context.report.id);
+        return toCompletedReportGenerationWorkflow(context.report.id);
       }
 
       const jobStore = getJobStore();
@@ -333,7 +344,7 @@ export function createReportService(
       }
 
       if (existingJob?.status === "running") {
-        return toReportGenerationState(existingJob);
+        return toReportGenerationWorkflow(existingJob);
       }
 
       const queuedJob =
@@ -347,7 +358,7 @@ export function createReportService(
         reportJobId: queuedJob.id,
       });
 
-      return toReportGenerationState(
+      return toReportGenerationWorkflow(
         existingJob?.status === "queued" ? existingJob : queuedJob,
       );
     },
@@ -356,7 +367,7 @@ export function createReportService(
 
     async processQueuedReportGeneration(
       input: ProcessQueuedReportInput,
-    ): Promise<ReportGenerationState | null> {
+    ): Promise<ReportGenerationWorkflow | null> {
       const jobStore = getJobStore();
       const claimedJob = await jobStore.claimReportGenerationJob({
         userId: input.userId,
@@ -372,7 +383,7 @@ export function createReportService(
         );
 
         if (existingJob?.status === "completed") {
-          return toReportGenerationState(existingJob);
+          return toReportGenerationWorkflow(existingJob);
         }
 
         return null;
@@ -386,7 +397,7 @@ export function createReportService(
           result.report.id,
         );
 
-        return toReportGenerationState(completedJob);
+        return toReportGenerationWorkflow(completedJob);
       } catch (error) {
         const isLastAttempt =
           typeof input.maxAttempts === "number"

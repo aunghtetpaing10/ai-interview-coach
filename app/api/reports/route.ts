@@ -13,7 +13,5 @@ export async function GET() {
   const reportService = createReportService(await createWorkspaceReportStore());
   const reports = await reportService.listReportOverviews(user.id);
 
-  return NextResponse.json({
-    reports,
-  });
+  return NextResponse.json({ reports });
 }

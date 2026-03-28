@@ -1,10 +1,29 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import type { InterviewSessionRow } from "@/db/schema";
-import { SessionServiceError, type CompleteInterviewSessionInput, type InterviewSessionStore } from "@/lib/session-service/session-service";
+import {
+  SessionServiceError,
+  type AppendTranscriptTurnsAck,
+  type CompleteInterviewSessionInput,
+  type InterviewSessionStore,
+} from "@/lib/session-service/session-service";
 import { clone, demoRuntime, DEMO_USER } from "./state";
 
 export function createDemoInterviewSessionStore(): InterviewSessionStore {
+  const appendBatchesBySessionId = new Map<
+    string,
+    Map<
+      string,
+      {
+        requestHash: string;
+        firstSequenceIndex: number;
+        nextSequenceIndex: number;
+        turnCount: number;
+      }
+    >
+  >();
+
   return {
     getTargetRoleById: async (userId: string, targetRoleId: string) => {
       const state = demoRuntime.readState();
@@ -14,6 +33,19 @@ export function createDemoInterviewSessionStore(): InterviewSessionStore {
       }
 
       return clone(state.targetRole);
+    },
+    findReusableSession: async (input) => {
+      const state = demoRuntime.readState();
+      const reusableSession = state.sessions.find(
+        (session) =>
+          session.userId === input.userId &&
+          session.targetRoleId === input.targetRoleId &&
+          session.mode === input.mode &&
+          session.status !== "completed" &&
+          session.status !== "archived",
+      );
+
+      return reusableSession ? clone(reusableSession) : null;
     },
     createSession: async (row) => {
       const state = demoRuntime.readState();
@@ -46,6 +78,7 @@ export function createDemoInterviewSessionStore(): InterviewSessionStore {
         title: row.title,
         overallScore,
         durationSeconds,
+        nextTranscriptSequenceIndex: row.nextTranscriptSequenceIndex ?? 0,
         startedAt,
         endedAt,
         createdAt: timestamp,
@@ -55,6 +88,7 @@ export function createDemoInterviewSessionStore(): InterviewSessionStore {
       state.nextSessionNumber += 1;
       state.sessions.unshift(session);
       state.transcriptTurnsBySessionId.set(session.id, []);
+      appendBatchesBySessionId.set(session.id, new Map());
       demoRuntime.writeState(state);
 
       return clone(session);
@@ -98,29 +132,87 @@ export function createDemoInterviewSessionStore(): InterviewSessionStore {
       }
 
       const createdAt = demoRuntime.advanceTime(state);
-      const currentTurns = state.transcriptTurnsBySessionId.get(session.id) ?? [];
-      const nextSequenceIndex =
-        currentTurns.length === 0
-          ? 0
-          : Math.max(...currentTurns.map((turn) => turn.sequenceIndex)) + 1;
-      const appendedTurns = input.turns.map((turn, index) => ({
-        id: `demo-turn-${session.id}-${nextSequenceIndex + index}`,
-        sessionId: session.id,
+      const batchId =
+        input.batchId ??
+        `legacy:${createdAt.getTime()}:${Math.random().toString(16).slice(2)}`;
+      const normalizedTurns = input.turns.map((turn) => ({
         speaker: turn.speaker,
         body: turn.body.trim(),
         seconds: turn.seconds,
-        sequenceIndex: nextSequenceIndex + index,
         confidence: turn.confidence ?? 100,
+      }));
+      const requestHash = createHash("sha256")
+        .update(JSON.stringify(normalizedTurns))
+        .digest("hex");
+      const sessionBatchMap =
+        appendBatchesBySessionId.get(session.id) ?? new Map();
+      appendBatchesBySessionId.set(session.id, sessionBatchMap);
+      const existingBatch = sessionBatchMap.get(batchId);
+
+      if (existingBatch) {
+        if (existingBatch.requestHash !== requestHash) {
+          throw new SessionServiceError(
+            "The same batch id was reused with different transcript turns.",
+            "idempotency_conflict",
+            409,
+          );
+        }
+
+        const replayAck: AppendTranscriptTurnsAck = {
+          session: clone(session),
+          batchId,
+          replayed: true,
+          firstSequenceIndex: existingBatch.firstSequenceIndex,
+          nextSequenceIndex: existingBatch.nextSequenceIndex,
+          appendedTurns: existingBatch.turnCount,
+        };
+
+        return replayAck;
+      }
+
+      const nextSequenceIndex = session.nextTranscriptSequenceIndex ?? 0;
+      const baseSequenceIndex = input.baseSequenceIndex ?? nextSequenceIndex;
+      if (baseSequenceIndex !== nextSequenceIndex) {
+        throw new SessionServiceError(
+          "Transcript sequence is out of date. Refresh and retry.",
+          "stale_sequence",
+          409,
+        );
+      }
+
+      const currentTurns = state.transcriptTurnsBySessionId.get(session.id) ?? [];
+      const appendedTurns = normalizedTurns.map((turn, index) => ({
+        id: `demo-turn-${session.id}-${nextSequenceIndex + index}`,
+        sessionId: session.id,
+        speaker: turn.speaker,
+        body: turn.body,
+        seconds: turn.seconds,
+        sequenceIndex: nextSequenceIndex + index,
+        confidence: turn.confidence,
         createdAt,
       }));
 
       state.transcriptTurnsBySessionId.set(session.id, [...currentTurns, ...appendedTurns]);
       session.status = "active";
       session.startedAt = session.startedAt ?? createdAt;
+      session.nextTranscriptSequenceIndex = nextSequenceIndex + appendedTurns.length;
       session.updatedAt = createdAt;
+      sessionBatchMap.set(batchId, {
+        requestHash,
+        firstSequenceIndex: nextSequenceIndex,
+        nextSequenceIndex: nextSequenceIndex + appendedTurns.length,
+        turnCount: appendedTurns.length,
+      });
       demoRuntime.writeState(state);
 
-      return clone(session);
+      return {
+        session: clone(session),
+        batchId,
+        replayed: false,
+        firstSequenceIndex: nextSequenceIndex,
+        nextSequenceIndex: nextSequenceIndex + appendedTurns.length,
+        appendedTurns: appendedTurns.length,
+      } satisfies AppendTranscriptTurnsAck;
     },
     completeSession: async (input: CompleteInterviewSessionInput) => {
       const state = demoRuntime.readState();
