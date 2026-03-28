@@ -53,6 +53,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
   const persistedNextSequenceIndexRef = useRef(
     initialSession.transcript.filter((turn) => turn.speaker !== "system").length,
   );
+  const pendingTranscriptPersistsRef = useRef<Set<Promise<void>>>(new Set());
   const connectionRef = useRef<{
     close(): void;
     sendText(text: string): void;
@@ -191,6 +192,11 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     dispatch({ type: "session-ended" });
 
     try {
+      const pendingPersists = Array.from(pendingTranscriptPersistsRef.current);
+      if (pendingPersists.length > 0) {
+        await Promise.allSettled(pendingPersists);
+      }
+
       const completeResponse = await fetch(
         `/api/interview/sessions/${state.sessionId}/complete`,
         {
@@ -274,41 +280,50 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     connectionRef.current?.sendText(trimmedDraft);
     dispatch({ type: "response-submitted" });
 
-    try {
-      const batchId = crypto.randomUUID();
-      const baseSequenceIndex = persistedNextSequenceIndexRef.current;
-      const response = await fetch(`/api/interview/sessions/${state.sessionId}/turns`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          batchId,
-          baseSequenceIndex,
-          turns: appendedTurns,
-        }),
-      });
+    const persistPromise = (async () => {
+      try {
+        const batchId = crypto.randomUUID();
+        const baseSequenceIndex = persistedNextSequenceIndexRef.current;
+        const response = await fetch(`/api/interview/sessions/${state.sessionId}/turns`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            batchId,
+            baseSequenceIndex,
+            turns: appendedTurns,
+          }),
+        });
 
-      if (!response.ok) {
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          const message =
+            payload?.error?.message ??
+            "The transcript updated locally, but the server could not persist the new turns.";
+
+          throw new Error(message);
+        }
+
         const payload = await response.json().catch(() => null);
-        const message =
-          payload?.error?.message ??
-          "The transcript updated locally, but the server could not persist the new turns.";
-
-        throw new Error(message);
+        const appendAck = payload?.data ?? payload;
+        if (typeof appendAck?.nextSequenceIndex === "number") {
+          persistedNextSequenceIndexRef.current = appendAck.nextSequenceIndex;
+        }
+      } catch (error) {
+        setRuntimeNotice(
+          error instanceof Error
+            ? error.message
+            : "The transcript updated locally, but the server could not persist the new turns.",
+        );
       }
+    })();
 
-      const payload = await response.json().catch(() => null);
-      const appendAck = payload?.data ?? payload;
-      if (typeof appendAck?.nextSequenceIndex === "number") {
-        persistedNextSequenceIndexRef.current = appendAck.nextSequenceIndex;
-      }
-    } catch (error) {
-      setRuntimeNotice(
-        error instanceof Error
-          ? error.message
-          : "The transcript updated locally, but the server could not persist the new turns.",
-      );
+    pendingTranscriptPersistsRef.current.add(persistPromise);
+    try {
+      await persistPromise;
+    } finally {
+      pendingTranscriptPersistsRef.current.delete(persistPromise);
     }
   }
 

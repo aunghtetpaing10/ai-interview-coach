@@ -663,11 +663,14 @@ export class DemoRuntime {
       return inMemoryState;
     }
 
-    if (persistedState && persistedStatePath === statePath) {
-      return persistedState;
+    const loadedState = loadStateFromFile(statePath);
+    if (loadedState) {
+      persistedState = loadedState;
+      persistedStatePath = statePath;
+      return loadedState;
     }
 
-    persistedState = loadStateFromFile(statePath) ?? createInitialState();
+    persistedState = createInitialState();
     persistedStatePath = statePath;
 
     return persistedState;
