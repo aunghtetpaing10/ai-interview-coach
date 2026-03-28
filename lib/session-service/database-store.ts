@@ -1,6 +1,7 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type {
   InterviewSessionRow,
   NewInterviewSessionRow,
@@ -10,10 +11,12 @@ import type {
 import {
   interviewSessions,
   targetRoles,
+  transcriptAppendBatches,
   transcriptTurns,
 } from "@/db/schema";
 import { getDb } from "@/lib/db/client";
 import {
+  type AppendTranscriptTurnsAck,
   SessionServiceError,
   type AppendTranscriptTurnsInput,
   type CompleteInterviewSessionInput,
@@ -66,6 +69,27 @@ export function createDatabaseInterviewSessionStore(): DatabaseInterviewSessionS
       return session;
     },
 
+    async findReusableSession(input): Promise<InterviewSessionRow | null> {
+      const sessions = await db
+        .select()
+        .from(interviewSessions)
+        .where(
+          and(
+            eq(interviewSessions.userId, input.userId),
+            eq(interviewSessions.targetRoleId, input.targetRoleId),
+            eq(interviewSessions.mode, input.mode),
+          ),
+        )
+        .orderBy(desc(interviewSessions.updatedAt))
+        .limit(10);
+
+      return (
+        sessions.find(
+          (session) => session.status !== "completed" && session.status !== "archived",
+        ) ?? null
+      );
+    },
+
     async getSession(userId: string, sessionId: string): Promise<InterviewSessionRow | null> {
       const [session] = await db
         .select()
@@ -86,8 +110,11 @@ export function createDatabaseInterviewSessionStore(): DatabaseInterviewSessionS
 
     async appendTranscriptTurns(
       input: AppendTranscriptTurnsInput,
-    ): Promise<InterviewSessionRow> {
+    ): Promise<AppendTranscriptTurnsAck> {
       const createdAt = new Date();
+      const batchId =
+        input.batchId ??
+        `legacy:${createdAt.getTime()}:${Math.random().toString(16).slice(2)}`;
 
       return db.transaction(async (tx) => {
         const session = await lockSessionRow(tx, input.userId, input.sessionId);
@@ -100,33 +127,84 @@ export function createDatabaseInterviewSessionStore(): DatabaseInterviewSessionS
           throw toCompletedSessionError();
         }
 
-        const existingTurns = await tx
-          .select()
-          .from(transcriptTurns)
-          .where(eq(transcriptTurns.sessionId, session.id))
-          .orderBy(asc(transcriptTurns.sequenceIndex), asc(transcriptTurns.createdAt));
-        const nextSequenceIndex =
-          existingTurns.length === 0
-            ? 0
-            : Math.max(...existingTurns.map((turn) => turn.sequenceIndex)) + 1;
-
-        const rows = input.turns.map((turn, index) => ({
-          sessionId: session.id,
+        const normalizedTurns = input.turns.map((turn) => ({
           speaker: turn.speaker,
           body: turn.body.trim(),
           seconds: turn.seconds,
-          sequenceIndex: nextSequenceIndex + index,
           confidence: turn.confidence ?? 100,
+        }));
+        const requestHash = createHash("sha256")
+          .update(JSON.stringify(normalizedTurns))
+          .digest("hex");
+        const [existingBatch] = await tx
+          .select()
+          .from(transcriptAppendBatches)
+          .where(
+            and(
+              eq(transcriptAppendBatches.sessionId, session.id),
+              eq(transcriptAppendBatches.batchId, batchId),
+            ),
+          )
+          .for("update")
+          .limit(1);
+
+        if (existingBatch) {
+          if (existingBatch.requestHash !== requestHash) {
+            throw new SessionServiceError(
+              "The same batch id was reused with different transcript turns.",
+              "idempotency_conflict",
+              409,
+            );
+          }
+
+          return {
+            session,
+            batchId,
+            replayed: true,
+            firstSequenceIndex: existingBatch.firstSequenceIndex,
+            nextSequenceIndex: existingBatch.lastSequenceIndex + 1,
+            appendedTurns: existingBatch.turnCount,
+          };
+        }
+
+        const baseSequenceIndex =
+          input.baseSequenceIndex ?? session.nextTranscriptSequenceIndex;
+        if (baseSequenceIndex !== session.nextTranscriptSequenceIndex) {
+          throw new SessionServiceError(
+            "Transcript sequence is out of date. Refresh and retry.",
+            "stale_sequence",
+            409,
+          );
+        }
+
+        const firstSequenceIndex = session.nextTranscriptSequenceIndex;
+        const rows = normalizedTurns.map((turn, index) => ({
+          sessionId: session.id,
+          speaker: turn.speaker,
+          body: turn.body,
+          seconds: turn.seconds,
+          sequenceIndex: firstSequenceIndex + index,
+          confidence: turn.confidence,
           createdAt,
         }));
 
         await tx.insert(transcriptTurns).values(rows);
+        await tx.insert(transcriptAppendBatches).values({
+          sessionId: session.id,
+          batchId,
+          requestHash,
+          turnCount: rows.length,
+          firstSequenceIndex,
+          lastSequenceIndex: firstSequenceIndex + rows.length - 1,
+          createdAt,
+        });
 
         const [updatedSession] = await tx
           .update(interviewSessions)
           .set({
             status: "active",
             startedAt: session.startedAt ?? createdAt,
+            nextTranscriptSequenceIndex: firstSequenceIndex + rows.length,
             updatedAt: createdAt,
           })
           .where(eq(interviewSessions.id, session.id))
@@ -136,7 +214,14 @@ export function createDatabaseInterviewSessionStore(): DatabaseInterviewSessionS
           throw new Error("Failed to update session.");
         }
 
-        return updatedSession;
+        return {
+          session: updatedSession,
+          batchId,
+          replayed: false,
+          firstSequenceIndex,
+          nextSequenceIndex: firstSequenceIndex + rows.length,
+          appendedTurns: rows.length,
+        };
       });
     },
 

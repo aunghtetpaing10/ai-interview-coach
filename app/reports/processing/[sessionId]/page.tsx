@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireWorkspaceUser } from "@/lib/auth/session";
 import { ReportProcessingPanel } from "@/components/reports/report-processing-panel";
 import { CandidateShell } from "@/components/workspace/candidate-shell";
-import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
+import { createReportService } from "@/lib/report-service/report-service";
 import {
   createWorkspaceInterviewRepository,
   createWorkspaceReportStore,
@@ -26,20 +26,9 @@ export default async function ReportProcessingPage({
   const workspace = await repository.getWorkspaceSnapshot(user.id);
   const userLabel = workspace.profile?.fullName ?? user.email ?? "Candidate";
 
-  const state = await reportService
-    .getReportGenerationState(user.id, sessionId)
-    .catch((error) => {
-      if (
-        error instanceof ReportServiceError &&
-        (error.code === "not_found" || error.code === "invalid_state")
-      ) {
-        return null;
-      }
+  const state = await reportService.getReportGenerationState(user.id, sessionId);
 
-      throw error;
-    });
-
-  if (!state) {
+  if (state.status === "not_requested") {
     redirect("/reports");
   }
 

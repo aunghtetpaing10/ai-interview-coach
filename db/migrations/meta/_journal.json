@@ -29,6 +29,13 @@
       "when": 1774310400000,
       "tag": "0003_inngest_report_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774636800000,
+      "tag": "0004_security_session_report_hardening",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, FileText, Sparkles } from "lucide-react";
 import { requireWorkspaceUser } from "@/lib/auth/session";
-import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
+import { createReportService } from "@/lib/report-service/report-service";
 import { CandidateShell } from "@/components/workspace/candidate-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -32,18 +32,7 @@ export default async function ReportsPage() {
   const latestReport = reportOverviews[0];
   const latestCompletedSession = sessions.find((session) => session.status === "completed") ?? null;
   const reportWorkflow = latestCompletedSession
-    ? await reportService
-        .getReportGenerationState(user.id, latestCompletedSession.id)
-        .catch((error) => {
-          if (
-            error instanceof ReportServiceError &&
-            (error.code === "not_found" || error.code === "invalid_state")
-          ) {
-            return null;
-          }
-
-          throw error;
-        })
+    ? await reportService.getReportGenerationState(user.id, latestCompletedSession.id)
     : null;
   const userLabel = user.email ?? "Candidate";
 

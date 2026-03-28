@@ -9,7 +9,7 @@ import {
 import { requireWorkspaceUser } from "@/lib/auth/session";
 import { buildDashboardReadModel } from "@/lib/dashboard/read-model";
 import { createProgressService } from "@/lib/progress-service/progress-service";
-import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
+import { createReportService } from "@/lib/report-service/report-service";
 import { CandidateShell } from "@/components/workspace/candidate-shell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -66,24 +66,17 @@ export default async function DashboardPage() {
     ? await reportService.getReportById(user.id, reportOverviews[0].id)
     : null;
   const latestReportWorkflow = latestCompletedSession
-    ? await reportService
-        .getReportGenerationState(user.id, latestCompletedSession.id)
-        .catch((error) => {
-          if (
-            error instanceof ReportServiceError &&
-            (error.code === "not_found" || error.code === "invalid_state")
-          ) {
-            return null;
-          }
-
-          throw error;
-        })
+    ? await reportService.getReportGenerationState(user.id, latestCompletedSession.id)
     : null;
   const model = buildDashboardReadModel({
     workspace,
     reportOverviews,
     latestReport,
-    reportWorkflow: latestReportWorkflow
+    reportWorkflow:
+      latestReportWorkflow &&
+      (latestReportWorkflow.status === "queued" ||
+        latestReportWorkflow.status === "running" ||
+        latestReportWorkflow.status === "failed")
       ? {
           sessionId: latestCompletedSession!.id,
           status: latestReportWorkflow.status,

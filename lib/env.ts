@@ -20,6 +20,8 @@ const envSchema = z.object({
   OPENAI_RESPONSES_MODEL: z.string().min(1).default("gpt-5.2"),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+  RATE_LIMIT_MODE: z.enum(["off", "monitor", "enforce"]).default("off"),
+  RATE_LIMIT_NAMESPACE: z.string().min(1).optional(),
   POSTHOG_KEY: z.string().min(1).optional(),
   POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
   SENTRY_AUTH_TOKEN: z.string().min(1).optional(),

@@ -22,6 +22,7 @@ import {
   createWorkspaceInterviewRepository,
   createWorkspaceInterviewSessionStore,
 } from "@/lib/workspace/runtime";
+import { bootstrapInterviewSessionAction } from "./actions";
 
 function parseRequestedMode(value: string | string[] | undefined): InterviewMode | null {
   if (typeof value !== "string") {
@@ -33,10 +34,19 @@ function parseRequestedMode(value: string | string[] | undefined): InterviewMode
     : null;
 }
 
+function parseRequestedSessionId(value: string | string[] | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const sessionId = value.trim();
+  return sessionId.length > 0 ? sessionId : null;
+}
+
 export default async function InterviewPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ mode?: string }>;
+  searchParams?: Promise<{ mode?: string; sessionId?: string }>;
 }) {
   const user = await requireWorkspaceUser("/interview");
   const repository = await createWorkspaceInterviewRepository();
@@ -124,7 +134,9 @@ export default async function InterviewPage({
     );
   }
 
-  const requestedMode = parseRequestedMode((await searchParams)?.mode);
+  const resolvedSearchParams = await searchParams;
+  const requestedMode = parseRequestedMode(resolvedSearchParams?.mode);
+  const requestedSessionId = parseRequestedSessionId(resolvedSearchParams?.sessionId);
   const mode = requestedMode ?? workspace.activeMode;
   const existingSession = (await repository.listWorkspaceSessions(user.id)).find(
     (session) =>
@@ -133,35 +145,96 @@ export default async function InterviewPage({
       session.status !== "completed" &&
       session.status !== "archived",
   );
-  const sessionView =
-    existingSession
-      ? await sessionService.getSession({
-          userId: user.id,
-          sessionId: existingSession.id,
-        })
-      : await sessionService.createSession({
-          userId: user.id,
-          targetRoleId: workspace.targetRole.id,
-          mode,
-          title: `${workspace.targetRole.title} interview`,
-        });
-  const hydratedSession =
-    sessionView && sessionView.transcriptTurns.length === 0
-      ? await sessionService.appendTranscriptTurns({
-          userId: user.id,
-          sessionId: sessionView.session.id,
-          turns: [
-            {
-              speaker: "interviewer",
-              body: getInterviewModePreset(mode).openingPrompt,
-              seconds: 8,
-            },
-          ],
-        })
-      : sessionView;
+  const activeSessionId = requestedSessionId ?? existingSession?.id ?? null;
+  const hydratedSession = activeSessionId
+    ? await sessionService.getSession({
+        userId: user.id,
+        sessionId: activeSessionId,
+      })
+    : null;
 
   if (!hydratedSession) {
-    throw new Error("Failed to load the interview room.");
+    const modePreset = getInterviewModePreset(mode);
+
+    return (
+      <CandidateShell
+        activeHref="/interview"
+        userLabel={candidateLabel}
+        headline={shellHeadline}
+        railNote="Session bootstrap now runs as an explicit user action, keeping the interview route fully read-only."
+      >
+        <section className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr] xl:items-end">
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge className="rounded-full bg-[rgba(20,63,134,0.12)] text-[color:var(--curator-navy)]">
+                Curator live room
+              </Badge>
+              <span className="font-mono text-xs uppercase tracking-[0.28em] text-[color:var(--curator-orange)]">
+                {modePreset.label}
+              </span>
+            </div>
+            <h1 className="curator-display max-w-4xl text-5xl text-[color:var(--curator-ink)] sm:text-6xl">
+              Start a new interview session when you are ready to persist transcript turns.
+            </h1>
+            <p className="max-w-2xl text-base leading-7 text-slate-700">
+              This page now stays read-only until you explicitly start a session.
+              Reopening the same mode reuses any unfinished session for the current
+              target role.
+            </p>
+          </div>
+
+          <Card className="curator-card">
+            <CardHeader className="space-y-4">
+              <Badge className="w-fit rounded-full bg-[rgba(20,63,134,0.12)] text-[color:var(--curator-navy)]">
+                Session bootstrap
+              </Badge>
+              <CardTitle className="text-2xl tracking-[-0.04em] text-[color:var(--curator-ink)]">
+                {workspace.targetRole.title}
+              </CardTitle>
+              <CardDescription className="text-base leading-7 text-slate-600">
+                {modePreset.focus}
+              </CardDescription>
+              <form action={bootstrapInterviewSessionAction} className="space-y-3">
+                <input type="hidden" name="mode" value={mode} />
+                <input
+                  type="hidden"
+                  name="targetRoleId"
+                  value={workspace.targetRole.id}
+                />
+                <input
+                  type="hidden"
+                  name="title"
+                  value={`${workspace.targetRole.title} interview`}
+                />
+                <button
+                  type="submit"
+                  className={cn(
+                    buttonVariants({
+                      className:
+                        "h-12 w-full rounded-full bg-[color:var(--curator-navy)] px-6 text-white hover:bg-[color:var(--curator-navy-strong)]",
+                    }),
+                  )}
+                >
+                  Start interview session
+                </button>
+              </form>
+              <Link
+                href="/dashboard"
+                className={cn(
+                  buttonVariants({
+                    variant: "outline",
+                    className:
+                      "h-12 w-full rounded-full border-[color:var(--curator-line)] bg-white/80",
+                  }),
+                )}
+              >
+                Back to dashboard
+              </Link>
+            </CardHeader>
+          </Card>
+        </section>
+      </CandidateShell>
+    );
   }
 
   const session = buildInterviewSessionStateFromView({

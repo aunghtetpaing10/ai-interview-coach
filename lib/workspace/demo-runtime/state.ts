@@ -1,7 +1,7 @@
 import "server-only";
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { INTERVIEW_SEED } from "@/db/seed";
 import type {
   FeedbackReportRow,
@@ -27,6 +27,7 @@ export const DEMO_USER: WorkspaceUser = {
 };
 
 export const DEMO_BASE_TIME = new Date("2026-03-19T09:00:00.000Z");
+const DEMO_RUNTIME_STATE_VERSION = 1;
 export const DEMO_PROMPT_VERSION: PromptVersionRow | null = (() => {
   const latestPromptVersion = INTERVIEW_SEED.promptVersions.at(-1);
 
@@ -212,6 +213,13 @@ export type SerializedDemoWorkspaceState = {
   clockTick: number;
 };
 
+type SerializedDemoWorkspaceStateEnvelopeV1 = {
+  version: 1;
+  state: SerializedDemoWorkspaceState;
+};
+
+type DemoRuntimeStateFile = SerializedDemoWorkspaceStateEnvelopeV1 | SerializedDemoWorkspaceState;
+
 function createInitialState(): DemoWorkspaceState {
   const draft = createDemoOnboardingDraft();
   const now = nextTimestamp(0);
@@ -232,8 +240,159 @@ function createInitialState(): DemoWorkspaceState {
   };
 }
 
+let inMemoryState = createInitialState();
+let persistedState: DemoWorkspaceState | null = null;
+let persistedStatePath: string | null = null;
+
 function getDemoRuntimeStatePath() {
-  return process.env.E2E_DEMO_STATE_PATH ?? join(".next", "cache", "e2e-demo-runtime.json");
+  const statePath = process.env.E2E_DEMO_STATE_PATH?.trim();
+
+  return statePath ? statePath : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getInitialSerializedState(): SerializedDemoWorkspaceState {
+  return serializeState(createInitialState());
+}
+
+function normalizeIsoString(value: unknown, fallback: string) {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function normalizeNullableIsoString(value: unknown, fallback: string | null) {
+  if (value === null) {
+    return null;
+  }
+
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function normalizeSerializedState(value: unknown): SerializedDemoWorkspaceState {
+  const defaults = getInitialSerializedState();
+  const source = isRecord(value) ? value : {};
+  const profileSource = isRecord(source.profile) ? source.profile : null;
+  const targetRoleSource = isRecord(source.targetRole) ? source.targetRole : null;
+  const jobTargetSource = isRecord(source.jobTarget) ? source.jobTarget : null;
+  const resumeAssetSource = isRecord(source.resumeAsset) ? source.resumeAsset : null;
+  const sessionDefaults = defaults.sessions[0] ?? {
+    id: "",
+    userId: "",
+    targetRoleId: "",
+    mode: "behavioral",
+    status: "draft",
+    title: "",
+    overallScore: null,
+    durationSeconds: 0,
+    nextTranscriptSequenceIndex: 0,
+    startedAt: null,
+    endedAt: null,
+    createdAt: defaults.profile.createdAt,
+    updatedAt: defaults.profile.updatedAt,
+  };
+
+  return {
+    draft: clone((isRecord(source.draft) ? source.draft : defaults.draft) as OnboardingDraft),
+    profile: {
+      ...defaults.profile,
+      ...(profileSource ?? {}),
+      createdAt: normalizeIsoString(profileSource?.createdAt, defaults.profile.createdAt),
+      updatedAt: normalizeIsoString(profileSource?.updatedAt, defaults.profile.updatedAt),
+    },
+    targetRole: {
+      ...defaults.targetRole,
+      ...(targetRoleSource ?? {}),
+      createdAt: normalizeIsoString(targetRoleSource?.createdAt, defaults.targetRole.createdAt),
+    },
+    jobTarget: {
+      ...defaults.jobTarget,
+      ...(jobTargetSource ?? {}),
+      createdAt: normalizeIsoString(jobTargetSource?.createdAt, defaults.jobTarget.createdAt),
+      updatedAt: normalizeIsoString(jobTargetSource?.updatedAt, defaults.jobTarget.updatedAt),
+    },
+    resumeAsset:
+      source.resumeAsset === null
+        ? null
+        : resumeAssetSource
+          ? {
+              id:
+                typeof resumeAssetSource.id === "string"
+                  ? resumeAssetSource.id
+                  : defaults.resumeAsset?.id ?? "demo-resume-1",
+              userId:
+                typeof resumeAssetSource.userId === "string"
+                  ? resumeAssetSource.userId
+                  : defaults.resumeAsset?.userId ?? DEMO_USER.id,
+              fileName:
+                typeof resumeAssetSource.fileName === "string"
+                  ? resumeAssetSource.fileName
+                  : defaults.resumeAsset?.fileName ?? "resume.txt",
+              storagePath:
+                typeof resumeAssetSource.storagePath === "string"
+                  ? resumeAssetSource.storagePath
+                  : defaults.resumeAsset?.storagePath ?? `demo/${DEMO_USER.id}/resume.txt`,
+              mimeType:
+                typeof resumeAssetSource.mimeType === "string"
+                  ? resumeAssetSource.mimeType
+                  : defaults.resumeAsset?.mimeType ?? "text/plain",
+              summary:
+                typeof resumeAssetSource.summary === "string"
+                  ? resumeAssetSource.summary
+                  : defaults.resumeAsset?.summary ?? "",
+              uploadedAt: normalizeIsoString(
+                resumeAssetSource.uploadedAt,
+                defaults.resumeAsset?.uploadedAt ?? defaults.profile.createdAt,
+              ),
+            }
+          : defaults.resumeAsset,
+    sessions: Array.isArray(source.sessions)
+      ? source.sessions.map((session) => ({
+          ...sessionDefaults,
+          ...(isRecord(session) ? session : {}),
+          createdAt: normalizeIsoString(
+            isRecord(session) ? session.createdAt : undefined,
+            defaults.profile.createdAt,
+          ),
+          updatedAt: normalizeIsoString(
+            isRecord(session) ? session.updatedAt : undefined,
+            defaults.profile.updatedAt,
+          ),
+          startedAt: normalizeNullableIsoString(
+            isRecord(session) ? session.startedAt : undefined,
+            null,
+          ),
+          endedAt: normalizeNullableIsoString(isRecord(session) ? session.endedAt : undefined, null),
+        }))
+      : defaults.sessions,
+    transcriptTurnsBySessionId: Array.isArray(source.transcriptTurnsBySessionId)
+      ? source.transcriptTurnsBySessionId
+      : defaults.transcriptTurnsBySessionId,
+    reportJobsBySessionId: Array.isArray(source.reportJobsBySessionId)
+      ? source.reportJobsBySessionId
+      : defaults.reportJobsBySessionId,
+    reportsById: Array.isArray(source.reportsById) ? source.reportsById : defaults.reportsById,
+    reportIdBySessionId: Array.isArray(source.reportIdBySessionId)
+      ? source.reportIdBySessionId
+      : defaults.reportIdBySessionId,
+    nextSessionNumber:
+      typeof source.nextSessionNumber === "number" && Number.isFinite(source.nextSessionNumber)
+        ? source.nextSessionNumber
+        : defaults.nextSessionNumber,
+    clockTick:
+      typeof source.clockTick === "number" && Number.isFinite(source.clockTick)
+        ? source.clockTick
+        : defaults.clockTick,
+  };
+}
+
+function normalizeDemoRuntimeStateFile(value: unknown): SerializedDemoWorkspaceState {
+  if (isRecord(value) && "version" in value && "state" in value) {
+    return normalizeSerializedState(value.state);
+  }
+
+  return normalizeSerializedState(value);
 }
 
 function serializeSession(session: InterviewSessionRow) {
@@ -432,6 +591,30 @@ export function serializeState(state: DemoWorkspaceState): SerializedDemoWorkspa
   };
 }
 
+function serializeStateFile(state: DemoWorkspaceState): SerializedDemoWorkspaceStateEnvelopeV1 {
+  return {
+    version: DEMO_RUNTIME_STATE_VERSION,
+    state: serializeState(state),
+  };
+}
+
+function loadStateFromFile(statePath: string): DemoWorkspaceState | null {
+  try {
+    return deserializeState(normalizeDemoRuntimeStateFile(JSON.parse(readFileSync(statePath, "utf8"))));
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "ENOENT"
+    ) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
 export function deserializeState(state: SerializedDemoWorkspaceState): DemoWorkspaceState {
   return {
     draft: clone(state.draft),
@@ -476,31 +659,51 @@ export class DemoRuntime {
   readState() {
     const statePath = getDemoRuntimeStatePath();
 
-    try {
-      return deserializeState(
-        JSON.parse(readFileSync(statePath, "utf8")) as SerializedDemoWorkspaceState,
-      );
-    } catch (error) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code: string }).code === "ENOENT"
-      ) {
-        const initialState = createInitialState();
-        this.writeState(initialState);
-        return initialState;
-      }
-
-      throw error;
+    if (!statePath) {
+      return inMemoryState;
     }
+
+    const loadedState = loadStateFromFile(statePath);
+    if (loadedState) {
+      persistedState = loadedState;
+      persistedStatePath = statePath;
+      return loadedState;
+    }
+
+    persistedState = createInitialState();
+    persistedStatePath = statePath;
+
+    return persistedState;
   }
 
   writeState(state: DemoWorkspaceState) {
     const statePath = getDemoRuntimeStatePath();
 
+    if (!statePath) {
+      inMemoryState = state;
+      return;
+    }
+
+    persistedState = state;
+    persistedStatePath = statePath;
     mkdirSync(dirname(statePath), { recursive: true });
-    writeFileSync(statePath, JSON.stringify(serializeState(state)), "utf8");
+    const tempPath = join(
+      dirname(statePath),
+      `${basename(statePath)}.${process.pid}.${Date.now()}.tmp`,
+    );
+
+    try {
+      writeFileSync(tempPath, JSON.stringify(serializeStateFile(state)), "utf8");
+      renameSync(tempPath, statePath);
+    } catch (error) {
+      try {
+        unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup failures.
+      }
+
+      throw error;
+    }
   }
 
   advanceTime(state: DemoWorkspaceState) {

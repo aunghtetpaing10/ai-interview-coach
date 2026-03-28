@@ -9,10 +9,15 @@ import type { InterviewMode } from "@/lib/types/interview";
 
 export interface InterviewSessionStore {
   getTargetRoleById(userId: string, targetRoleId: string): Promise<TargetRoleRow | null>;
+  findReusableSession(input: {
+    userId: string;
+    targetRoleId: string;
+    mode: InterviewMode;
+  }): Promise<InterviewSessionRow | null>;
   createSession(row: NewInterviewSessionRow): Promise<InterviewSessionRow>;
   getSession(userId: string, sessionId: string): Promise<InterviewSessionRow | null>;
   listTranscriptTurns(sessionId: string): Promise<readonly TranscriptTurnRow[]>;
-  appendTranscriptTurns(input: AppendTranscriptTurnsInput): Promise<InterviewSessionRow>;
+  appendTranscriptTurns(input: AppendTranscriptTurnsInput): Promise<AppendTranscriptTurnsAck>;
   completeSession(input: CompleteInterviewSessionInput): Promise<InterviewSessionRow>;
 }
 
@@ -29,15 +34,31 @@ export interface CreateInterviewSessionInput {
   durationSeconds?: number;
 }
 
+export interface BootstrapInterviewSessionInput extends CreateInterviewSessionInput {
+  openingPrompt: string;
+  openingPromptSeconds?: number;
+}
+
 export interface AppendTranscriptTurnsInput {
   userId: string;
   sessionId: string;
+  batchId?: string;
+  baseSequenceIndex?: number;
   turns: readonly {
     speaker: TranscriptSpeaker;
     body: string;
     seconds: number;
     confidence?: number;
   }[];
+}
+
+export interface AppendTranscriptTurnsAck {
+  session: InterviewSessionRow;
+  batchId: string;
+  replayed: boolean;
+  firstSequenceIndex: number;
+  nextSequenceIndex: number;
+  appendedTurns: number;
 }
 
 export interface CompleteInterviewSessionInput {
@@ -47,7 +68,11 @@ export interface CompleteInterviewSessionInput {
   endedAt?: Date;
 }
 
-export type SessionServiceErrorCode = "not_found" | "invalid_state";
+export type SessionServiceErrorCode =
+  | "not_found"
+  | "invalid_state"
+  | "idempotency_conflict"
+  | "stale_sequence";
 
 export class SessionServiceError extends Error {
   constructor(
@@ -90,6 +115,7 @@ export function createInterviewSessionService(store: InterviewSessionStore) {
         title: input.title,
         overallScore: null,
         durationSeconds: input.durationSeconds ?? 18 * 60,
+        nextTranscriptSequenceIndex: 0,
         startedAt: null,
         endedAt: null,
         createdAt: new Date(),
@@ -113,13 +139,99 @@ export function createInterviewSessionService(store: InterviewSessionStore) {
       return toSessionView(session, transcriptTurns);
     },
 
+    async bootstrapSession(
+      input: BootstrapInterviewSessionInput,
+    ): Promise<InterviewSessionView> {
+      const existingSession = await store.findReusableSession({
+        userId: input.userId,
+        targetRoleId: input.targetRoleId,
+        mode: input.mode,
+      });
+      const session =
+        existingSession ??
+        (await store.createSession({
+          userId: input.userId,
+          targetRoleId: input.targetRoleId,
+          mode: input.mode,
+          status: "draft",
+          title: input.title,
+          overallScore: null,
+          durationSeconds: input.durationSeconds ?? 18 * 60,
+          nextTranscriptSequenceIndex: 0,
+          startedAt: null,
+          endedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+      const transcriptTurns = await store.listTranscriptTurns(session.id);
+
+      if (transcriptTurns.length === 0) {
+        await store.appendTranscriptTurns({
+          userId: input.userId,
+          sessionId: session.id,
+          batchId: `bootstrap:${session.id}`,
+          baseSequenceIndex: session.nextTranscriptSequenceIndex,
+          turns: [
+            {
+              speaker: "interviewer",
+              body: input.openingPrompt,
+              seconds: input.openingPromptSeconds ?? 8,
+            },
+          ],
+        });
+      }
+
+      const hydratedSession =
+        (await store.getSession(input.userId, session.id)) ?? session;
+      const hydratedTranscriptTurns = await store.listTranscriptTurns(hydratedSession.id);
+
+      return toSessionView(hydratedSession, hydratedTranscriptTurns);
+    },
+
     async appendTranscriptTurns(
       input: AppendTranscriptTurnsInput,
     ): Promise<InterviewSessionView> {
-      const updatedSession = await store.appendTranscriptTurns(input);
-      const transcriptTurns = await store.listTranscriptTurns(updatedSession.id);
+      await store.appendTranscriptTurns(input);
+      const session = await store.getSession(input.userId, input.sessionId);
 
-      return toSessionView(updatedSession, transcriptTurns);
+      if (!session) {
+        throw new SessionServiceError("Session not found.", "not_found", 404);
+      }
+
+      const transcriptTurns = await store.listTranscriptTurns(session.id);
+      return toSessionView(session, transcriptTurns);
+    },
+
+    async appendTranscriptTurnsWithAck(
+      input: AppendTranscriptTurnsInput,
+    ): Promise<AppendTranscriptTurnsAck> {
+      const result = (await store.appendTranscriptTurns(input)) as
+        | AppendTranscriptTurnsAck
+        | InterviewSessionRow;
+
+      if ("session" in result) {
+        return result;
+      }
+
+      const fallbackFirstSequenceIndex =
+        input.baseSequenceIndex ??
+        Math.max(
+          0,
+          (result.nextTranscriptSequenceIndex ?? input.turns.length) -
+            input.turns.length,
+        );
+      const fallbackNextSequenceIndex =
+        result.nextTranscriptSequenceIndex ??
+        fallbackFirstSequenceIndex + input.turns.length;
+
+      return {
+        session: result,
+        batchId: input.batchId ?? "legacy",
+        replayed: false,
+        firstSequenceIndex: fallbackFirstSequenceIndex,
+        nextSequenceIndex: fallbackNextSequenceIndex,
+        appendedTurns: input.turns.length,
+      };
     },
 
     async completeSession(

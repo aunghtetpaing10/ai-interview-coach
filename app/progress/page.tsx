@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPostHogTelemetryStatus } from "@/lib/analytics/posthog";
 import { getSentryTelemetryStatus } from "@/lib/observability/sentry";
 import { createProgressService } from "@/lib/progress-service/progress-service";
-import { createReportService, ReportServiceError } from "@/lib/report-service/report-service";
+import { createReportService } from "@/lib/report-service/report-service";
 import { getRateLimitTelemetryStatus } from "@/lib/rate-limit/upstash";
 import { cn } from "@/lib/utils";
 import {
@@ -36,18 +36,7 @@ export default async function ProgressPage() {
   ]);
   const latestCompletedSessionId = sessions[0]?.id ?? null;
   const latestReportWorkflow = latestCompletedSessionId
-    ? await reportService
-        .getReportGenerationState(user.id, latestCompletedSessionId)
-        .catch((error) => {
-          if (
-            error instanceof ReportServiceError &&
-            (error.code === "not_found" || error.code === "invalid_state")
-          ) {
-            return null;
-          }
-
-          throw error;
-        })
+    ? await reportService.getReportGenerationState(user.id, latestCompletedSessionId)
     : null;
   const posthog = getPostHogTelemetryStatus();
   const sentry = getSentryTelemetryStatus();

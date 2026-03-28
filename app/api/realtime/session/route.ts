@@ -7,6 +7,8 @@ import {
   createRealtimeClientSecret,
   toRealtimeSessionSecretPayload,
 } from "@/lib/openai/realtime-session";
+import { buildRateLimitResponse } from "@/lib/rate-limit/http";
+import { evaluateRateLimit, getRequestIp } from "@/lib/rate-limit/upstash";
 
 const realtimeSessionRequestSchema = z.object({
   candidateName: z.string().trim().min(1),
@@ -17,17 +19,26 @@ const realtimeSessionRequestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  if (!(await getWorkspaceUser())) {
+  const user = await getWorkspaceUser();
+  if (!user) {
     return NextResponse.json(
       { error: "Authentication required." },
       { status: 401 },
     );
   }
+  const rateLimitEvaluation = await evaluateRateLimit("realtime_session", {
+    ip: getRequestIp(request),
+    user: user.id,
+  });
+  if (!rateLimitEvaluation.success && rateLimitEvaluation.enforced) {
+    return buildRateLimitResponse(rateLimitEvaluation);
+  }
+  const rateLimitHeaders = rateLimitEvaluation.headers;
 
   if (isE2EDemoMode()) {
     return NextResponse.json(
       { error: "OpenAI Realtime is disabled in demo mode." },
-      { status: 503 },
+      { status: 503, headers: rateLimitHeaders },
     );
   }
 
@@ -36,7 +47,7 @@ export async function POST(request: Request) {
   if (!env.OPENAI_API_KEY) {
     return NextResponse.json(
       { error: "OpenAI Realtime is not configured." },
-      { status: 503 },
+      { status: 503, headers: rateLimitHeaders },
     );
   }
 
@@ -49,7 +60,7 @@ export async function POST(request: Request) {
         error: "Invalid realtime session request.",
         fieldErrors: parsed.error.flatten().fieldErrors,
       },
-      { status: 400 },
+      { status: 400, headers: rateLimitHeaders },
     );
   }
 
@@ -64,5 +75,5 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ...toRealtimeSessionSecretPayload(session),
-  });
+  }, { headers: rateLimitHeaders });
 }

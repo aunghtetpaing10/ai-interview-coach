@@ -32,6 +32,18 @@ function buildStore() {
         ? targetRole
         : null;
     },
+    async findReusableSession(input) {
+      const session = [...sessions.values()].find(
+        (candidate) =>
+          candidate.userId === input.userId &&
+          candidate.targetRoleId === input.targetRoleId &&
+          candidate.mode === input.mode &&
+          candidate.status !== "completed" &&
+          candidate.status !== "archived",
+      );
+
+      return session ?? null;
+    },
     async createSession(row: NewInterviewSessionRow) {
       const session: InterviewSessionRow = {
         id: "session-1",
@@ -42,6 +54,7 @@ function buildStore() {
         title: row.title,
         overallScore: row.overallScore ?? null,
         durationSeconds: row.durationSeconds ?? 18 * 60,
+        nextTranscriptSequenceIndex: row.nextTranscriptSequenceIndex ?? 0,
         startedAt: row.startedAt ?? null,
         endedAt: row.endedAt ?? null,
         createdAt: row.createdAt ?? new Date("2026-03-19T00:00:00.000Z"),
@@ -97,11 +110,19 @@ function buildStore() {
         ...session,
         status: "active" as const,
         startedAt: session.startedAt ?? createdAt,
+        nextTranscriptSequenceIndex: (session.nextTranscriptSequenceIndex ?? 0) + appended.length,
         updatedAt: createdAt,
       };
       sessions.set(input.sessionId, updated);
 
-      return updated;
+      return {
+        session: updated,
+        batchId: input.batchId ?? "test-batch",
+        replayed: false,
+        firstSequenceIndex: current.length,
+        nextSequenceIndex: current.length + appended.length,
+        appendedTurns: appended.length,
+      };
     },
     async completeSession(input) {
       const session = sessions.get(input.sessionId);
