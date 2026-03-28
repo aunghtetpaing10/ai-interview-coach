@@ -65,11 +65,20 @@ async function completeInterviewToProcessing(page: Page) {
 
   await page.goto("/interview?mode=system-design");
 
-  await expect(
-    page.getByRole("heading", {
-      name: /practice like the transcript is already under editorial review\./i,
-    }),
-  ).toBeVisible();
+  const liveHeading = page.getByRole("heading", {
+    name: /practice like the transcript is already under editorial review\./i,
+  });
+  const bootstrapHeading = page.getByRole("heading", {
+    name: /start a new interview session when you are ready to persist transcript turns\./i,
+  });
+
+  const isLiveRoomVisible = await liveHeading.isVisible().catch(() => false);
+  if (!isLiveRoomVisible) {
+    await expect(bootstrapHeading).toBeVisible();
+    await page.getByRole("button", { name: /start interview session/i }).click();
+    await page.waitForURL(/\/interview\?mode=system-design&sessionId=/);
+    await expect(liveHeading).toBeVisible();
+  }
 
   await page.getByRole("button", { name: /start live session/i }).click();
 
