@@ -332,6 +332,72 @@ describe("interview api routes", () => {
     });
   });
 
+  it("rejects unauthenticated transcript append requests", async () => {
+    getWorkspaceUserMock.mockResolvedValue(null);
+
+    const response = await appendTurnsRoute(
+      new Request(
+        "http://localhost/api/interview/sessions/session-1/turns",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            batchId: "batch-1",
+            baseSequenceIndex: 0,
+            turns: [
+              {
+                speaker: "candidate",
+                body: "Here is my follow-up answer with clear ownership and impact details.",
+                seconds: 12,
+              },
+            ],
+          }),
+        },
+      ),
+      { params: Promise.resolve({ sessionId: "session-1" }) },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "Unauthorized",
+    });
+  });
+
+  it("returns service error details when appending to an unknown session", async () => {
+    getWorkspaceUserMock.mockResolvedValue({
+      id: "user-1",
+      email: "candidate@example.com",
+      source: "supabase",
+    });
+    createWorkspaceInterviewSessionStoreMock.mockReturnValue(buildStore().store);
+
+    const response = await appendTurnsRoute(
+      new Request(
+        "http://localhost/api/interview/sessions/missing/turns",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            batchId: "batch-2",
+            baseSequenceIndex: 0,
+            turns: [
+              {
+                speaker: "candidate",
+                body: "I tracked ownership and outcomes across the project lifecycle.",
+                seconds: 32,
+              },
+            ],
+          }),
+        },
+      ),
+      { params: Promise.resolve({ sessionId: "missing" }) },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "Session not found.",
+      code: "not_found",
+    });
+  });
+
   it("rejects invalid completion payloads with field errors", async () => {
     getWorkspaceUserMock.mockResolvedValue({
       id: "user-1",

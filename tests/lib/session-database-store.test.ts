@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { interviewSessions, transcriptTurns, type TranscriptTurnRow } from "@/db/schema";
+import {
+  interviewSessions,
+  transcriptAppendBatches,
+  transcriptTurns,
+  type TranscriptTurnRow,
+} from "@/db/schema";
 import { createDatabaseInterviewSessionStore } from "@/lib/session-service/database-store";
 
 const getDbMock = vi.hoisted(() => vi.fn());
@@ -21,6 +26,7 @@ function buildDbMock({ conflictSequenceIndex }: { conflictSequenceIndex?: number
       title: "Queue scaling drill",
       overallScore: null,
       durationSeconds: 18 * 60,
+      nextTranscriptSequenceIndex: 1,
       startedAt: null,
       endedAt: null,
       createdAt: new Date("2026-03-19T00:00:00.000Z"),
@@ -77,15 +83,22 @@ function buildDbMock({ conflictSequenceIndex }: { conflictSequenceIndex?: number
     },
     insert(table: unknown) {
       return {
-        values(rows: readonly Record<string, unknown>[]) {
+        values(rows: readonly Record<string, unknown>[] | Record<string, unknown>) {
           let executed = false;
 
           const executeInsert = () => {
-            if (executed || table !== transcriptTurns) {
+            if (executed) {
               return [];
             }
 
             executed = true;
+            if (table === transcriptAppendBatches) {
+              return [rows];
+            }
+
+            if (table !== transcriptTurns || !Array.isArray(rows)) {
+              return [];
+            }
 
             if (
               conflictSequenceIndex !== undefined &&
@@ -177,9 +190,9 @@ describe("database interview session store", () => {
     });
 
     expect(db.transaction).toHaveBeenCalledTimes(1);
-    expect(session.status).toBe("active");
-    expect(session.startedAt).toBeInstanceOf(Date);
-    expect(session.startedAt).toEqual(state.session.startedAt);
+    expect(session.session.status).toBe("active");
+    expect(session.session.startedAt).toBeInstanceOf(Date);
+    expect(session.session.startedAt).toEqual(state.session.startedAt);
     expect(state.transcriptTurns).toHaveLength(3);
     expect(state.transcriptTurns.slice(-2).map((turn) => turn.sequenceIndex)).toEqual([1, 2]);
   });
