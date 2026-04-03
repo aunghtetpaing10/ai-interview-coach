@@ -65,24 +65,22 @@ async function completeInterviewToProcessing(page: Page) {
 
   await page.goto("/interview?mode=system-design");
 
-  const liveHeading = page.getByRole("heading", {
-    name: /practice like the transcript is already under editorial review\./i,
-  });
+  const liveRoomMarker = page.getByRole("button", { name: /start live session/i });
   const bootstrapHeading = page.getByRole("heading", {
-    name: /start a new interview session when you are ready to persist transcript turns\./i,
+    name: /start the next interview from a real question, not a generic mode tab\./i,
   });
 
-  const isLiveRoomVisible = await liveHeading.isVisible().catch(() => false);
+  const isLiveRoomVisible = await liveRoomMarker.isVisible().catch(() => false);
   if (!isLiveRoomVisible) {
     await expect(bootstrapHeading).toBeVisible();
     await page.getByRole("button", { name: /start interview session/i }).click();
-    await page.waitForURL(/\/interview\?mode=system-design&sessionId=/);
-    await expect(liveHeading).toBeVisible();
+    await page.waitForURL(/\/interview\?mode=system-design.*sessionId=/);
+    await expect(liveRoomMarker).toBeVisible();
   }
 
-  await page.getByRole("button", { name: /start live session/i }).click();
+  await liveRoomMarker.click();
 
-  const responseDraft = page.getByPlaceholder(/draft your answer to:/i);
+  const responseDraft = page.getByPlaceholder(/respond to/i);
   const responseText =
     "I owned a queue-backed rollout that kept incident response under five minutes.";
   await responseDraft.fill(responseText);
@@ -150,7 +148,7 @@ test("shows pending report workflow on dashboard and progress before completion"
   await page.goto("/dashboard");
 
   await expect(page.getByRole("heading", { name: /good evening,/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /track report status/i })).toBeVisible();
+  await expect(page.locator('a[href*="/reports/processing/"]').first()).toBeVisible();
   await expect(page.getByText(/latest report processing/i)).toBeVisible();
 
   await page.goto("/progress");

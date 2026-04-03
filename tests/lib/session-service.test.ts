@@ -10,6 +10,7 @@ import {
   SessionServiceError,
   type InterviewSessionStore,
 } from "@/lib/session-service/session-service";
+import { makeInterviewSessionRow } from "@/tests/helpers/factories";
 
 function buildStore() {
   const targetRole: TargetRoleRow = {
@@ -45,11 +46,15 @@ function buildStore() {
       return session ?? null;
     },
     async createSession(row: NewInterviewSessionRow) {
-      const session: InterviewSessionRow = {
+      const session: InterviewSessionRow = makeInterviewSessionRow({
         id: "session-1",
         userId: row.userId,
         targetRoleId: row.targetRoleId,
         mode: row.mode,
+        practiceStyle: row.practiceStyle ?? "live",
+        difficulty: row.difficulty ?? "challenging",
+        companyStyle: row.companyStyle ?? null,
+        questionId: row.questionId ?? null,
         status: row.status ?? "draft",
         title: row.title,
         overallScore: row.overallScore ?? null,
@@ -59,7 +64,7 @@ function buildStore() {
         endedAt: row.endedAt ?? null,
         createdAt: row.createdAt ?? new Date("2026-03-19T00:00:00.000Z"),
         updatedAt: row.updatedAt ?? new Date("2026-03-19T00:00:00.000Z"),
-      };
+      });
 
       sessions.set(session.id, session);
       turns.set(session.id, []);

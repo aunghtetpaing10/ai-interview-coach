@@ -1,24 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { InterviewSessionRow } from "@/db/schema";
 import { deriveActiveMode } from "@/lib/data/active-mode";
+import { makeInterviewSessionRow } from "@/tests/helpers/factories";
 
 function buildSession(
-  overrides: Partial<InterviewSessionRow>,
-): InterviewSessionRow {
-  return {
-    id: overrides.id ?? "session-1",
-    userId: overrides.userId ?? "user-1",
-    targetRoleId: overrides.targetRoleId ?? "target-1",
-    mode: overrides.mode ?? "behavioral",
-    status: overrides.status ?? "draft",
-    title: overrides.title ?? "Interview",
-    overallScore: overrides.overallScore ?? null,
-    durationSeconds: overrides.durationSeconds ?? 18 * 60,
-    startedAt: overrides.startedAt ?? null,
-    endedAt: overrides.endedAt ?? null,
-    createdAt: overrides.createdAt ?? new Date("2026-03-18T10:00:00.000Z"),
-    updatedAt: overrides.updatedAt ?? new Date("2026-03-18T10:15:00.000Z"),
-  };
+  overrides: Parameters<typeof makeInterviewSessionRow>[0],
+) {
+  return makeInterviewSessionRow(overrides);
 }
 
 describe("deriveActiveMode", () => {

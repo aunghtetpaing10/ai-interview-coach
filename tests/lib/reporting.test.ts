@@ -5,19 +5,19 @@ import {
   generatePracticePlan,
   rewriteAnswerDraft,
 } from "@/lib/reporting/reporting";
+import { makeScorecard } from "@/tests/helpers/factories";
 
 describe("reporting helpers", () => {
-  const scorecard = {
-    mode: "project",
+  const scorecard = makeScorecard("project", {
     overallScore: 83,
-    competencies: {
-      clarity: 84,
-      ownership: 78,
-      "technical-depth": 87,
-      communication: 80,
-      "systems-thinking": 75,
+    dimensionScores: {
+      credibility: 84,
+      scope: 78,
+      "decision-quality": 87,
+      "technical-depth": 80,
+      impact: 75,
     },
-  } as const;
+  });
 
   const transcript = [
     {
@@ -44,8 +44,8 @@ describe("reporting helpers", () => {
     const summary = summarizeScorecard(scorecard);
 
     expect(summary.band).toBe("strong");
-    expect(summary.strengths[0]).toContain("Technical depth");
-    expect(summary.growthAreas[0]).toContain("Systems thinking");
+    expect(summary.strengths[0]).toContain("Decision quality");
+    expect(summary.growthAreas[0]).toContain("Impact");
     expect(summary.headline).toContain("Strong and trending up");
   });
 
@@ -99,8 +99,8 @@ describe("reporting helpers", () => {
     });
 
     expect(plan.title).toContain("Mid-level software engineer");
-    expect(plan.focus).toContain("Strong and trending up");
-    expect(plan.steps[0].title).toContain("constraints");
+    expect(plan.focus).toContain("Project walkthrough focus");
+    expect(plan.steps[0].title).toContain("Tighten");
     expect(plan.steps).toHaveLength(3);
   });
 });

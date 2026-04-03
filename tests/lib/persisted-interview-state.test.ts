@@ -1,22 +1,25 @@
 import { describe, expect, it } from "vitest";
 import type { InterviewSessionView } from "@/lib/session-service/session-service";
 import { buildInterviewSessionStateFromView } from "@/lib/interview-session/persisted";
+import { makeInterviewSessionRow } from "@/tests/helpers/factories";
 
 function makeSessionView(): InterviewSessionView {
   return {
     session: {
-      id: "session-1",
-      userId: "user-1",
-      targetRoleId: "target-1",
-      mode: "system-design",
-      status: "active",
-      title: "Platform engineer interview",
-      overallScore: null,
-      durationSeconds: 18 * 60,
-      startedAt: new Date("2026-03-19T10:00:00.000Z"),
-      endedAt: null,
-      createdAt: new Date("2026-03-19T09:59:00.000Z"),
-      updatedAt: new Date("2026-03-19T10:05:00.000Z"),
+      ...makeInterviewSessionRow({
+        id: "session-1",
+        userId: "user-1",
+        targetRoleId: "target-1",
+        mode: "system-design",
+        status: "active",
+        title: "Platform engineer interview",
+        overallScore: null,
+        durationSeconds: 18 * 60,
+        startedAt: new Date("2026-03-19T10:00:00.000Z"),
+        endedAt: null,
+        createdAt: new Date("2026-03-19T09:59:00.000Z"),
+        updatedAt: new Date("2026-03-19T10:05:00.000Z"),
+      }),
     },
     transcriptTurns: [
       {
@@ -71,7 +74,7 @@ describe("buildInterviewSessionStateFromView", () => {
     expect(state.sessionId).toBe("session-1");
     expect(state.transcript).toHaveLength(4);
     expect(state.activePrompt).toBe("What are the hardest bottlenecks and why?");
-    expect(state.questionIndex).toBe(1);
+    expect(state.stageIndex).toBe(1);
     expect(state.elapsedSeconds).toBe(28);
     expect(state.status).toBe("idle");
   });
@@ -96,6 +99,6 @@ describe("buildInterviewSessionStateFromView", () => {
 
     expect(state.transcript[1]?.speaker).toBe("interviewer");
     expect(state.activePrompt).toBe(state.transcript[1]?.text);
-    expect(state.questionIndex).toBe(0);
+    expect(state.stageIndex).toBe(0);
   });
 });

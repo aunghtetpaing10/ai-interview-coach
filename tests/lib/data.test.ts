@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SEED_QUESTION_BANK, SEED_RUBRIC_DIMENSIONS } from "@/db/seed";
 import { createSeededInterviewRepository } from "@/lib/data/repository";
 import { getWorkspaceMetricCopy } from "@/lib/data/workspace";
+import { makeInterviewSessionRow } from "@/tests/helpers/factories";
 
 describe("seeded interview repository", () => {
   it("returns deterministic question bank entries by mode", async () => {
@@ -9,8 +10,8 @@ describe("seeded interview repository", () => {
 
     const systemDesignQuestions = await repository.listQuestionBank("system-design");
 
-    expect(systemDesignQuestions).toHaveLength(1);
-    expect(systemDesignQuestions[0]?.id).toBe("question_system_design_capacity");
+    expect(systemDesignQuestions).toHaveLength(12);
+    expect(systemDesignQuestions[0]?.id).toBe("question_system_notifications_01");
     expect(systemDesignQuestions[0]?.prompt).toContain("notification service");
   });
 
@@ -38,7 +39,7 @@ describe("seeded interview repository", () => {
         },
       ],
       sessions: [
-        {
+        makeInterviewSessionRow({
           id: "session_1",
           userId: "user_1",
           targetRoleId: "target_1",
@@ -51,7 +52,7 @@ describe("seeded interview repository", () => {
           endedAt: new Date("2026-03-18T00:20:00.000Z"),
           createdAt: new Date("2026-03-18T00:00:00.000Z"),
           updatedAt: new Date("2026-03-18T00:20:00.000Z"),
-        },
+        }),
       ],
     });
 

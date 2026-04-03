@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
+import {
+  makeInterviewReport,
+  makeInterviewSessionRow,
+  makeReportOverview as buildReportOverview,
+} from "@/tests/helpers/factories";
 
 const {
   requireWorkspaceUserMock,
@@ -59,54 +64,15 @@ import ReportsPage from "@/app/reports/page";
 import ReportDetailPage from "@/app/reports/[reportId]/page";
 
 function makeReportOverview(): ReportOverview {
-  return {
-    id: "report-1",
-    title: "Queue scaling drill",
-    sessionDate: "March 19, 2026",
-    candidate: "Aung Htet Paing",
-    targetRole: "Platform engineer",
-    promptVersion: "Scorecard v1",
-    scorecard: {
-      mode: "project",
-      overallScore: 84,
-      competencies: {
-        clarity: 84,
-        ownership: 78,
-        "technical-depth": 87,
-        communication: 80,
-        "systems-thinking": 75,
-      },
-    },
-    summary: {
-      score: 84,
-      band: "strong",
-      headline: "Strong and trending up with clear upside in systems thinking.",
-      strengths: ["Technical depth 87%", "Clarity 84%"],
-      growthAreas: ["Systems thinking 75%", "Ownership 78%"],
-    },
-    strengths: ["Technical depth 87%", "Clarity 84%"],
-    growthAreas: ["Systems thinking 75%", "Ownership 78%"],
-  };
+  return buildReportOverview();
 }
 
 function makeReport(): InterviewReport {
-  const overview = makeReportOverview();
-
-  return {
-    ...overview,
-    transcript: [
-      {
-        id: "turn-1",
-        speaker: "candidate",
-        text: "I owned the retry policy and moved the queue onto Kafka.",
-        timestampSeconds: 29,
-      },
-    ],
-    citations: [],
-    rewrites: [],
+  return makeInterviewReport({
+    ...buildReportOverview(),
     practicePlan: {
       title: "Platform engineer practice plan",
-      focus: overview.summary.headline,
+      focus: "Strong and trending up with clear upside in systems thinking.",
       steps: [
         {
           id: "step-1",
@@ -117,7 +83,7 @@ function makeReport(): InterviewReport {
         },
       ],
     },
-  };
+  });
 }
 
 describe("reports pages", () => {
@@ -154,7 +120,7 @@ describe("reports pages", () => {
     createWorkspaceInterviewRepositoryMock.mockResolvedValue(repository);
     createWorkspaceReportStoreMock.mockReturnValue({});
     repository.listWorkspaceSessions.mockResolvedValue([
-      {
+      makeInterviewSessionRow({
         id: "session-1",
         userId: user.id,
         targetRoleId: "target-1",
@@ -167,7 +133,7 @@ describe("reports pages", () => {
         endedAt: new Date("2026-03-19T10:18:00.000Z"),
         createdAt: new Date("2026-03-19T09:59:00.000Z"),
         updatedAt: new Date("2026-03-19T10:18:00.000Z"),
-      },
+      }),
     ]);
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([]),
@@ -190,7 +156,7 @@ describe("reports pages", () => {
     createWorkspaceInterviewRepositoryMock.mockResolvedValue(repository);
     createWorkspaceReportStoreMock.mockReturnValue({});
     repository.listWorkspaceSessions.mockResolvedValue([
-      {
+      makeInterviewSessionRow({
         id: "session-1",
         userId: user.id,
         targetRoleId: "target-1",
@@ -203,7 +169,7 @@ describe("reports pages", () => {
         endedAt: new Date("2026-03-19T10:18:00.000Z"),
         createdAt: new Date("2026-03-19T09:59:00.000Z"),
         updatedAt: new Date("2026-03-19T10:18:00.000Z"),
-      },
+      }),
     ]);
     createReportServiceMock.mockReturnValue({
       listReportOverviews: vi.fn().mockResolvedValue([]),

@@ -53,6 +53,7 @@ vi.mock("@/lib/openai/realtime-session", async () => {
 });
 
 import { POST } from "@/app/api/realtime/session/route";
+import { makeRealtimeInput } from "@/tests/helpers/factories";
 
 function createRequest(body: Record<string, unknown>) {
   return new Request("http://localhost/api/realtime/session", {
@@ -63,6 +64,12 @@ function createRequest(body: Record<string, unknown>) {
 }
 
 describe("POST /api/realtime/session", () => {
+  const realtimeInput = makeRealtimeInput({
+    targetRole: "Backend Software Engineer",
+    focus: "systems",
+    openingPrompt: "Start here.",
+  });
+
   beforeEach(() => {
     getEnvMock.mockReset();
     isE2EDemoModeMock.mockReset();
@@ -111,13 +118,7 @@ describe("POST /api/realtime/session", () => {
     });
 
     const response = await POST(
-      createRequest({
-        candidateName: "Aung",
-        targetRole: "Backend Software Engineer",
-        mode: "system-design",
-        focus: "systems",
-        openingPrompt: "Start here.",
-      }),
+      createRequest(realtimeInput),
     );
 
     expect(response.status).toBe(401);
@@ -141,13 +142,7 @@ describe("POST /api/realtime/session", () => {
     });
 
     const response = await POST(
-      createRequest({
-        candidateName: "Aung",
-        targetRole: "Backend Software Engineer",
-        mode: "system-design",
-        focus: "systems",
-        openingPrompt: "Start here.",
-      }),
+      createRequest(realtimeInput),
     );
 
     expect(response.status).toBe(503);
@@ -172,13 +167,7 @@ describe("POST /api/realtime/session", () => {
     });
 
     const response = await POST(
-      createRequest({
-        candidateName: "Aung",
-        targetRole: "Backend Software Engineer",
-        mode: "system-design",
-        focus: "systems",
-        openingPrompt: "Start here.",
-      }),
+      createRequest(realtimeInput),
     );
 
     expect(response.status).toBe(503);
@@ -217,13 +206,7 @@ describe("POST /api/realtime/session", () => {
     });
 
     const response = await POST(
-      createRequest({
-        candidateName: "Aung",
-        targetRole: "Backend Software Engineer",
-        mode: "system-design",
-        focus: "systems",
-        openingPrompt: "Start here.",
-      }),
+      createRequest(realtimeInput),
     );
 
     expect(response.status).toBe(200);
@@ -277,13 +260,7 @@ describe("POST /api/realtime/session", () => {
     });
 
     const response = await POST(
-      createRequest({
-        candidateName: "Aung",
-        targetRole: "Backend Software Engineer",
-        mode: "system-design",
-        focus: "systems",
-        openingPrompt: "Start here.",
-      }),
+      createRequest(realtimeInput),
     );
 
     expect(response.status).toBe(429);

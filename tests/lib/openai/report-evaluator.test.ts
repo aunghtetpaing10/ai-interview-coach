@@ -22,19 +22,10 @@ vi.mock("openai", () => ({
 import type { ReportEvaluation } from "@/lib/openai/report-evaluator";
 import { createOpenAIResponsesReportEvaluator } from "@/lib/openai/report-evaluator";
 import type { ReportGenerationContext } from "@/lib/report-service/report-service";
+import { makeInterviewSessionRow, makeScorecard } from "@/tests/helpers/factories";
 
 const parsedEvaluation: ReportEvaluation = {
-  scorecard: {
-    mode: "project",
-    overallScore: 84,
-    competencies: {
-      clarity: 84,
-      ownership: 78,
-      "technical-depth": 87,
-      communication: 80,
-      "systems-thinking": 75,
-    },
-  },
+  scorecard: makeScorecard("project"),
   summary: {
     score: 84,
     band: "strong",
@@ -72,18 +63,20 @@ function makeTranscriptTurn(index: number) {
 function makeContext(overrides: Partial<ReportGenerationContext> = {}): ReportGenerationContext {
   return {
     session: {
-      id: "session-123",
-      userId: "user_1",
-      targetRoleId: "target-1",
-      mode: "project",
-      status: "completed",
-      title: "Queue scaling drill",
-      overallScore: 84,
-      durationSeconds: 18 * 60,
-      startedAt: new Date("2026-03-19T10:00:00.000Z"),
-      endedAt: new Date("2026-03-19T10:18:00.000Z"),
-      createdAt: new Date("2026-03-19T09:59:00.000Z"),
-      updatedAt: new Date("2026-03-19T10:18:00.000Z"),
+      ...makeInterviewSessionRow({
+        id: "session-123",
+        userId: "user_1",
+        targetRoleId: "target-1",
+        mode: "project",
+        status: "completed",
+        title: "Queue scaling drill",
+        overallScore: 84,
+        durationSeconds: 18 * 60,
+        startedAt: new Date("2026-03-19T10:00:00.000Z"),
+        endedAt: new Date("2026-03-19T10:18:00.000Z"),
+        createdAt: new Date("2026-03-19T09:59:00.000Z"),
+        updatedAt: new Date("2026-03-19T10:18:00.000Z"),
+      }),
     },
     profile: {
       id: "profile-1",

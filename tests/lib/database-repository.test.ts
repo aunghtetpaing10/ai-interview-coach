@@ -1,15 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   InterviewMode,
-  InterviewSessionRow,
   JobTargetRow,
   ProfileRow,
-  QuestionBankRow,
   ResumeAssetRow,
   RubricDimensionRow,
   TargetRoleRow,
 } from "@/db/schema";
 import { createDatabaseInterviewRepository } from "@/lib/data/database-repository";
+import {
+  makeInterviewSessionRow,
+  makeQuestionBankRow,
+} from "@/tests/helpers/factories";
 
 vi.mock("server-only", () => ({}));
 
@@ -67,29 +69,29 @@ function makeRepositoryFixture() {
     },
   ];
 
-  const questionBank: readonly QuestionBankRow[] = [
-    {
+  const questionBank = [
+    makeQuestionBankRow({
       id: "66666666-6666-6666-6666-666666666666",
       mode: "system-design",
+      title: "Notification service",
       prompt: "Design a notification service.",
       followUps: ["How do you handle retries?"],
       rubricKeys: ["technical-depth", "systems-thinking"],
-      sourceTag: "seed",
       orderIndex: 1,
-    },
-    {
+    }),
+    makeQuestionBankRow({
       id: "77777777-7777-7777-7777-777777777777",
       mode: "behavioral",
+      title: "Ownership under pressure",
       prompt: "Tell me about a time you owned a problem.",
       followUps: ["What changed because of your decision?"],
       rubricKeys: ["ownership", "communication"],
-      sourceTag: "seed",
       orderIndex: 2,
-    },
+    }),
   ];
 
-  const sessions: readonly InterviewSessionRow[] = [
-    {
+  const sessions = [
+    makeInterviewSessionRow({
       id: "88888888-8888-8888-8888-888888888888",
       userId: profile.userId,
       targetRoleId: targetRole.id,
@@ -102,7 +104,7 @@ function makeRepositoryFixture() {
       durationSeconds: 18 * 60,
       createdAt: new Date("2026-03-18T09:59:00.000Z"),
       updatedAt: new Date("2026-03-18T10:18:00.000Z"),
-    },
+    }),
   ];
 
   return createDatabaseInterviewRepository({
@@ -158,7 +160,7 @@ describe("database interview repository", () => {
       },
       async listSessions() {
         return [
-          {
+          makeInterviewSessionRow({
             id: "session-1",
             userId: "user-1",
             targetRoleId: "target-role-1",
@@ -171,8 +173,8 @@ describe("database interview repository", () => {
             endedAt: null,
             createdAt: new Date("2026-03-18T09:00:00.000Z"),
             updatedAt: new Date("2026-03-18T09:30:00.000Z"),
-          },
-          {
+          }),
+          makeInterviewSessionRow({
             id: "session-2",
             userId: "user-1",
             targetRoleId: "target-role-1",
@@ -185,7 +187,7 @@ describe("database interview repository", () => {
             endedAt: null,
             createdAt: new Date("2026-03-18T10:00:00.000Z"),
             updatedAt: new Date("2026-03-18T10:20:00.000Z"),
-          },
+          }),
         ];
       },
       async listQuestionBank() {

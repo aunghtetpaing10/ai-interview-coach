@@ -13,6 +13,7 @@ import type {
 import type { ReportGenerationContext } from "@/lib/report-service/report-service";
 import type { ReportGenerationJobRow } from "@/db/schema";
 import { createReportService } from "@/lib/report-service/report-service";
+import { makeInterviewReport, makeInterviewSessionRow, makeReportOverview } from "@/tests/helpers/factories";
 
 const scorecardSummary: ScorecardSummary = {
   score: 84,
@@ -50,28 +51,15 @@ const practicePlan: PracticePlan = {
   ],
 };
 
-const reportOverview: ReportOverview = {
+const reportOverview: ReportOverview = makeReportOverview({
   id: "report-123",
   title: "Live interview report: queue scaling",
-  sessionDate: "March 19, 2026",
   candidate: "Aung Paing",
   targetRole: "Platform engineer",
-  promptVersion: "report-rubric-v1",
-  scorecard: {
-    mode: "project",
-    overallScore: 84,
-    competencies: {
-      clarity: 84,
-      ownership: 78,
-      "technical-depth": 87,
-      communication: 80,
-      "systems-thinking": 75,
-    },
-  },
   summary: scorecardSummary,
   strengths: scorecardSummary.strengths,
   growthAreas: scorecardSummary.growthAreas,
-};
+});
 
 const citationBlocks: CitationBlock[] = [
   {
@@ -97,7 +85,7 @@ const answerRewrites: AnswerRewrite[] = [
   },
 ];
 
-const reportDetail: InterviewReport = {
+const reportDetail: InterviewReport = makeInterviewReport({
   ...reportOverview,
   transcript: [
     {
@@ -116,25 +104,27 @@ const reportDetail: InterviewReport = {
   citations: citationBlocks,
   rewrites: answerRewrites,
   practicePlan,
-};
+});
 
 function makeGenerationContext(
   overrides: Partial<ReportGenerationContext> = {},
 ): ReportGenerationContext {
   return {
     session: {
-      id: "session-123",
-      userId: "user_1",
-      targetRoleId: "target-1",
-      mode: "project",
-      status: "completed",
-      title: "Queue scaling drill",
-      overallScore: 84,
-      durationSeconds: 18 * 60,
-      startedAt: new Date("2026-03-19T10:00:00.000Z"),
-      endedAt: new Date("2026-03-19T10:18:00.000Z"),
-      createdAt: new Date("2026-03-19T09:59:00.000Z"),
-      updatedAt: new Date("2026-03-19T10:18:00.000Z"),
+      ...makeInterviewSessionRow({
+        id: "session-123",
+        userId: "user_1",
+        targetRoleId: "target-1",
+        mode: "project",
+        status: "completed",
+        title: "Queue scaling drill",
+        overallScore: 84,
+        durationSeconds: 18 * 60,
+        startedAt: new Date("2026-03-19T10:00:00.000Z"),
+        endedAt: new Date("2026-03-19T10:18:00.000Z"),
+        createdAt: new Date("2026-03-19T09:59:00.000Z"),
+        updatedAt: new Date("2026-03-19T10:18:00.000Z"),
+      }),
     },
     profile: {
       id: "profile-1",
