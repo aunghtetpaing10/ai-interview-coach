@@ -1,4 +1,4 @@
-ALTER TABLE "interview_sessions" DROP CONSTRAINT "interview_sessions_mode_check";--> statement-breakpoint
+ALTER TABLE "interview_sessions" DROP CONSTRAINT IF EXISTS "interview_sessions_mode_check";--> statement-breakpoint
 DROP INDEX IF EXISTS "transcript_turns_session_id_idx";--> statement-breakpoint
 ALTER TABLE "interview_sessions" ADD COLUMN "practice_style" text DEFAULT 'live' NOT NULL;--> statement-breakpoint
 ALTER TABLE "interview_sessions" ADD COLUMN "difficulty" text DEFAULT 'standard' NOT NULL;--> statement-breakpoint
