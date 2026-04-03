@@ -1,25 +1,43 @@
-import { buildCompetencyTrend, deriveReadinessState, getInterviewModeLabel } from "@/lib/domain/interview";
+import type { InterviewSessionRow } from "@/db/schema";
+import {
+  buildDimensionTrend,
+  deriveReadinessState,
+  getInterviewDifficultyLabel,
+  getInterviewModeLabel,
+} from "@/lib/domain/interview";
 import type { ProgressDashboardSnapshot } from "@/lib/analytics/progress";
 import type { WorkspaceSnapshot } from "@/lib/data/repository";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
-import type { InterviewMode, Scorecard } from "@/lib/types/interview";
+import type { InterviewMode } from "@/lib/types/interview";
 
 type DashboardModeCard = {
   mode: InterviewMode;
   label: string;
-  competencies: Array<{
+  averageScore: number;
+  readiness: string;
+  dimensions: Array<{
     label: string;
     score: number;
     note: string;
   }>;
   coachingTitle: string;
   coachingBody: string;
+  href: string;
 };
 
 type DashboardPracticeStep = {
   title: string;
   description: string;
   length: string;
+};
+
+type DashboardQuestionPreview = {
+  id: string;
+  title: string;
+  modeLabel: string;
+  difficultyLabel: string;
+  prompt: string;
+  href: string;
 };
 
 export interface DashboardReportWorkflow {
@@ -81,21 +99,24 @@ export interface DashboardReadModel {
     fileName: string;
     summary: string;
   } | null;
-  questionPreview: Array<{
-    id: string;
-    modeLabel: string;
-    prompt: string;
-  }>;
+  nextRecommendedQuestion: DashboardQuestionPreview | null;
+  questionPreview: DashboardQuestionPreview[];
   scorecards: DashboardModeCard[];
   practicePlan: DashboardPracticeStep[];
 }
 
 const DASHBOARD_MODES: InterviewMode[] = [
   "behavioral",
+  "coding",
+  "system-design",
   "resume",
   "project",
-  "system-design",
 ];
+
+const SESSION_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
 
 function deriveFirstName(snapshot: WorkspaceSnapshot) {
   const fullName = snapshot.profile?.fullName?.trim();
@@ -108,43 +129,60 @@ function deriveFirstName(snapshot: WorkspaceSnapshot) {
 
 function buildModeCards(reportOverviews: readonly ReportOverview[]): DashboardModeCard[] {
   return DASHBOARD_MODES.map((mode) => {
-    const scorecards = reportOverviews
-      .filter((report) => report.scorecard.mode === mode)
-      .map((report) => report.scorecard);
-    const competencyTrend = buildCompetencyTrend(scorecards as Scorecard[]);
-    const latestOverviewForMode = reportOverviews.find((report) => report.scorecard.mode === mode);
-    const populated = scorecards.length > 0;
+    const reportsForMode = reportOverviews.filter((report) => report.scorecard.mode === mode);
+    const trend = buildDimensionTrend(reportsForMode.map((report) => report.scorecard));
+    const averageScore =
+      reportsForMode.length === 0
+        ? 0
+        : Math.round(
+            reportsForMode.reduce((sum, report) => sum + report.scorecard.overallScore, 0) /
+              reportsForMode.length,
+          );
+    const leadDimension = trend[0];
+    const focusDimension = trend.at(-1);
+    const latestOverviewForMode = reportsForMode[0];
+    const populated = reportsForMode.length > 0;
 
     return {
       mode,
       label: getInterviewModeLabel(mode),
-      competencies: competencyTrend.map((item) => ({
+      averageScore,
+      readiness: populated ? deriveReadinessState(averageScore) : "training",
+      dimensions: trend.slice(0, 3).map((item) => ({
         label: item.label,
         score: item.score,
         note:
-          !populated
-            ? "No completed report yet. Finish a session in this track to populate the rubric."
-            : item.score >= 80
-              ? "This signal is holding up. Keep the evidence concrete."
-              : "This still needs a tighter answer spine and clearer tradeoffs.",
+          item.key === focusDimension?.key
+            ? "This is the first repair target."
+            : item.key === leadDimension?.key
+              ? "This is carrying the track right now."
+              : "This dimension is holding steady across recent reports.",
       })),
       coachingTitle: populated
         ? latestOverviewForMode?.summary.headline ?? "Keep tightening the answer."
-        : "No completed session yet",
+        : `No ${getInterviewModeLabel(mode).toLowerCase()} report yet`,
       coachingBody: populated
-        ? `Latest focus: ${(latestOverviewForMode?.growthAreas ?? []).join(" | ")}`
-        : "Start a live session in this mode to replace the placeholder card with real report data.",
+        ? `Next focus: ${(latestOverviewForMode?.growthAreas ?? []).join(" | ")}`
+        : `Run a ${mode === "behavioral" || mode === "coding" || mode === "system-design" ? "core-track" : "supporting"} session here to populate a track-specific scorecard.`,
+      href: `/interview?mode=${mode}`,
     };
   });
 }
 
-const SESSION_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-});
+function buildQuestionPreview(questions: WorkspaceSnapshot["questionPreview"]): DashboardQuestionPreview[] {
+  return questions.map((question) => ({
+    id: question.id,
+    title: question.title,
+    modeLabel: getInterviewModeLabel(question.mode),
+    difficultyLabel: getInterviewDifficultyLabel(question.difficulty),
+    prompt: question.prompt,
+    href: `/interview?mode=${question.mode}&practiceStyle=guided&difficulty=${question.difficulty}&questionId=${question.id}`,
+  }));
+}
 
 export function buildDashboardReadModel(input: {
   workspace: WorkspaceSnapshot;
+  sessions: readonly InterviewSessionRow[];
   reportOverviews: readonly ReportOverview[];
   latestReport: InterviewReport | null;
   reportWorkflow?: DashboardReportWorkflow | null;
@@ -158,11 +196,7 @@ export function buildDashboardReadModel(input: {
     "Target role";
   const readinessBand =
     input.progressSnapshot?.readinessBand ??
-    deriveReadinessState(
-      input.reportOverviews[0]?.scorecard.overallScore ?? 0,
-    );
-  const weakestTrack = input.progressSnapshot?.weakestTrack.label ?? "system design";
-  const strongestTrack = input.progressSnapshot?.strongestTrack.label ?? "project walkthrough";
+    deriveReadinessState(input.reportOverviews[0]?.scorecard.overallScore ?? 0);
   const latestReport = input.latestReport;
   const reportWorkflow =
     input.reportWorkflow && input.reportWorkflow.status !== "completed"
@@ -182,6 +216,13 @@ export function buildDashboardReadModel(input: {
           error: input.reportWorkflow.error,
         }
       : null;
+  const completedSessions = input.sessions.filter((session) => session.status === "completed");
+  const guidedDrills = completedSessions.filter((session) => session.practiceStyle === "guided");
+  const liveMocks = completedSessions.filter((session) => session.practiceStyle === "live");
+  const questionPreview = buildQuestionPreview(input.workspace.questionPreview);
+  const nextRecommendedQuestion = questionPreview[0] ?? null;
+  const strongestTrack = input.progressSnapshot?.strongestTrack.label ?? "Behavioral";
+  const weakestTrack = input.progressSnapshot?.weakestTrack.label ?? "System design";
 
   return {
     firstName,
@@ -190,11 +231,11 @@ export function buildDashboardReadModel(input: {
     targetRole,
     heroDescription: reportWorkflow
       ? reportWorkflow.status === "failed"
-        ? "The latest interview finished, but report generation failed. Re-run the job to publish a fresh scorecard and practice plan."
-        : "The latest interview finished and the report is processing in the background. Keep the dashboard open or follow the processing page for completion."
-      : latestReport
-      ? `${strongestTrack} is currently your strongest track, while ${weakestTrack.toLowerCase()} still needs a tighter explanation of constraints and tradeoffs.`
-      : "Save onboarding data, complete your first interview, and the dashboard will replace these placeholders with persisted score trends and a practice plan.",
+        ? "The latest interview finished, but report generation failed. Re-run the job to publish the new scorecard and replay actions."
+        : "The latest interview finished and the report is still processing. The dashboard will promote the track-specific feedback as soon as it lands."
+      : latestReport && nextRecommendedQuestion
+        ? `${strongestTrack} is currently strongest, ${weakestTrack.toLowerCase()} still needs work, and the next recommended question is ${nextRecommendedQuestion.title.toLowerCase()}.`
+        : "Complete guided drills and live mocks across behavioral, coding, and system design to turn this dashboard into a real readiness view.",
     reportWorkflow,
     stats: [
       {
@@ -202,15 +243,25 @@ export function buildDashboardReadModel(input: {
         value: readinessBand,
         copy: latestReport
           ? latestReport.summary.headline
-          : "Your readiness band will update after the first completed report.",
+          : "Your readiness band updates after the first completed report.",
         icon: "target",
       },
       {
-        label: "Live sessions completed",
-        value: String(input.completedSessionCount),
-        copy: input.completedSessionCount > 0
-          ? "Completed sessions now persist and feed the rest of the product loop."
-          : "No completed sessions yet. Start one from the interview room.",
+        label: "Guided drills",
+        value: String(guidedDrills.length),
+        copy:
+          guidedDrills.length > 0
+            ? "Guided reps are landing and can be replayed into the same question family."
+            : "No guided drills completed yet. Use guided mode to repair weak dimensions before live pressure.",
+        icon: "plan",
+      },
+      {
+        label: "Live mocks",
+        value: String(liveMocks.length),
+        copy:
+          liveMocks.length > 0
+            ? "Live mocks simulate interviewer pressure without leaking solutions."
+            : "No live mocks completed yet. Switch to live mode once the answer spine is stable.",
         icon: "voice",
       },
       {
@@ -221,37 +272,28 @@ export function buildDashboardReadModel(input: {
             ? "The latest report failed and needs a retry before the newest session can be reviewed."
             : "A background report job is still processing the newest completed session."
           : input.reportOverviews.length > 0
-          ? "Each report is stored and can be reopened from the latest feedback surface."
-          : "Reports are generated asynchronously after a session completes.",
+            ? "Track-specific reports now keep artifacts, replay actions, and dimension-level scoring."
+            : "Reports are generated after a session completes and persist as stable deep links.",
         icon: "report",
       },
-      {
-        label: "Practice streak",
-        value: input.progressSnapshot ? `${input.progressSnapshot.streakDays} days` : "0 days",
-        copy: input.progressSnapshot
-          ? "Repeated short drills now show up as real progress history."
-          : "Your streak starts after the first completed session.",
-        icon: "plan",
-      },
     ],
-    nextDrillTitle:
-      reportWorkflow
-        ? reportWorkflow.status === "failed"
-          ? "Recover the failed report run"
-          : "Wait for the latest report"
-        : latestReport?.practicePlan.steps[0]?.title ??
-      `Start a ${input.workspace.activeMode.replace("-", " ")} session`,
-    nextDrillDescription:
-      reportWorkflow
-        ? reportWorkflow.description
+    nextDrillTitle: reportWorkflow
+      ? reportWorkflow.status === "failed"
+        ? "Recover the failed report run"
+        : "Wait for the latest report"
+      : nextRecommendedQuestion?.title ??
+        latestReport?.practicePlan.steps[0]?.title ??
+        `Start a ${input.workspace.activeMode.replace("-", " ")} session`,
+    nextDrillDescription: reportWorkflow
+      ? reportWorkflow.description
+      : nextRecommendedQuestion
+        ? `${nextRecommendedQuestion.modeLabel} | ${nextRecommendedQuestion.difficultyLabel} | ${nextRecommendedQuestion.prompt}`
         : latestReport?.practicePlan.steps[0]
-        ? `${latestReport.practicePlan.steps[0].drill} ${latestReport.practicePlan.steps[0].outcome}`.trim()
-        : "Use the interview room to create the first persisted transcript and report.",
+          ? `${latestReport.practicePlan.steps[0].drill} ${latestReport.practicePlan.steps[0].outcome}`.trim()
+          : "Use the interview room to start a guided drill or live mock.",
     latestSession: input.progressSnapshot
       ? {
-          trackLabel: getInterviewModeLabel(
-            input.progressSnapshot.latestSession.track as InterviewMode,
-          ),
+          trackLabel: getInterviewModeLabel(input.progressSnapshot.latestSession.track as InterviewMode),
           focus: input.progressSnapshot.latestSession.focus,
           note: input.progressSnapshot.latestSession.note,
           score: input.progressSnapshot.latestSession.score,
@@ -271,11 +313,12 @@ export function buildDashboardReadModel(input: {
           summary: latestReport.summary.headline,
         }
       : null,
-    timeline: input.progressSnapshot?.timeline.slice(-4).map((point) => ({
-      label: point.label,
-      score: point.score,
-      trackLabel: getInterviewModeLabel(point.track as InterviewMode),
-    })) ?? [],
+    timeline:
+      input.progressSnapshot?.timeline.slice(-5).map((point) => ({
+        label: point.label,
+        score: point.score,
+        trackLabel: getInterviewModeLabel(point.track as InterviewMode),
+      })) ?? [],
     jobTarget: input.workspace.jobTarget
       ? {
           companyName: input.workspace.jobTarget.companyName,
@@ -289,11 +332,8 @@ export function buildDashboardReadModel(input: {
           summary: input.workspace.resumeAsset.summary,
         }
       : null,
-    questionPreview: input.workspace.questionPreview.map((question) => ({
-      id: question.id,
-      modeLabel: getInterviewModeLabel(question.mode),
-      prompt: question.prompt,
-    })),
+    nextRecommendedQuestion,
+    questionPreview,
     scorecards: buildModeCards(input.reportOverviews),
     practicePlan:
       latestReport?.practicePlan.steps.map((step) => ({

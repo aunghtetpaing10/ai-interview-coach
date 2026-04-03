@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { normalizeScorecard } from "@/lib/domain/interview";
 import type { InterviewReport } from "@/lib/reporting/types";
 
 type ReportScoreGridProps = {
@@ -8,26 +9,32 @@ type ReportScoreGridProps = {
 };
 
 export function ReportScoreGrid({ report }: ReportScoreGridProps) {
+  const scorecard = normalizeScorecard(report.scorecard);
+
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {Object.entries(report.scorecard.competencies).map(([label, score]) => (
-        <Card key={label} className="border-slate-200/60 bg-white/85">
+      {scorecard.dimensions.map((dimension) => (
+        <Card key={dimension.key} className="border-slate-200/60 bg-white/85">
           <CardHeader className="pb-3">
             <CardDescription className="uppercase tracking-[0.22em] text-slate-500">
-              {label.replace("-", " ")}
+              {dimension.label}
             </CardDescription>
             <CardTitle className="text-3xl font-semibold tracking-[-0.03em] text-slate-950">
-              {score}%
+              {dimension.score}%
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Progress value={score} className="h-2.5" />
+            <Progress value={dimension.score} className="h-2.5" />
             <p className="text-sm leading-6 text-slate-600">
               {report.summary.strengths.some((item) =>
-                item.toLowerCase().includes(label.replace("-", " ")),
+                item.toLowerCase().includes(dimension.label.toLowerCase()),
               )
                 ? "This is one of the stronger signals in the report."
-                : "This is a good candidate for more deliberate practice."}
+                : report.summary.growthAreas.some((item) =>
+                      item.toLowerCase().includes(dimension.label.toLowerCase()),
+                    )
+                  ? "This is one of the weaker signals and should be the first repair target."
+                  : dimension.evidenceSummary}
             </p>
           </CardContent>
         </Card>

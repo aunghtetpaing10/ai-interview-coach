@@ -11,6 +11,89 @@ import type {
 import { INTERVIEW_SEED } from "@/db/seed";
 import { deriveActiveMode } from "@/lib/data/active-mode";
 
+const CORE_TRACKS: InterviewMode[] = ["behavioral", "coding", "system-design"];
+
+function tokenize(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 4);
+}
+
+export function selectQuestionPreview(input: {
+  questions: readonly QuestionBankRow[];
+  activeMode: InterviewMode;
+  profile: ProfileRow | null;
+  targetRole: TargetRoleRow | null;
+  jobTarget: JobTargetRow | null;
+  limit?: number;
+}) {
+  const contextTokens = new Set([
+    ...tokenize(input.profile?.headline),
+    ...tokenize(input.profile?.targetRole),
+    ...tokenize(input.targetRole?.title),
+    ...(input.targetRole?.focusAreas ?? []).flatMap((area) => tokenize(area)),
+    ...tokenize(input.jobTarget?.companyName),
+    ...tokenize(input.jobTarget?.jobTitle),
+    ...tokenize(input.jobTarget?.jobDescription),
+  ]);
+
+  const scored = input.questions.map((question) => {
+    const haystack = [
+      question.title,
+      question.prompt,
+      question.questionFamily,
+      question.interviewerGoal,
+      question.followUpPolicy,
+      ...(question.companyTags ?? []),
+      ...(question.rubricKeys ?? []),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    let score = 0;
+
+    if (question.mode === input.activeMode) {
+      score += 6;
+    }
+
+    if (CORE_TRACKS.includes(question.mode)) {
+      score += 3;
+    }
+
+    if (question.difficulty === "challenging") {
+      score += 2;
+    } else if (question.difficulty === "standard") {
+      score += 1;
+    }
+
+    if (
+      input.jobTarget?.companyName &&
+      (question.companyTags ?? []).some(
+        (tag) => tag.toLowerCase() === input.jobTarget?.companyName.toLowerCase(),
+      )
+    ) {
+      score += 4;
+    }
+
+    for (const token of contextTokens) {
+      if (haystack.includes(token)) {
+        score += 1;
+      }
+    }
+
+    return {
+      question,
+      score,
+    };
+  });
+
+  return scored
+    .sort((left, right) => right.score - left.score || left.question.orderIndex - right.question.orderIndex)
+    .slice(0, input.limit ?? 3)
+    .map((entry) => entry.question);
+}
+
 export interface WorkspaceSnapshot {
   profile: ProfileRow | null;
   targetRole: TargetRoleRow | null;
@@ -70,17 +153,24 @@ export function createSeededInterviewRepository(
 
       const activeTargetRole =
         userTargetRoles.find((targetRole) => targetRole.active) ?? userTargetRoles[0] ?? null;
+      const activeMode = deriveActiveMode(userSessions);
 
       return {
         profile: workspace.profile ?? null,
         targetRole: activeTargetRole,
         jobTarget: workspace.jobTarget ?? null,
         resumeAsset: workspace.resumeAsset ?? null,
-        activeMode: deriveActiveMode(userSessions),
+        activeMode,
         questionCount: questions.length,
         rubricCount: rubrics.length,
         recentSessionCount: userSessions.length,
-        questionPreview: questions.slice(0, 3),
+        questionPreview: selectQuestionPreview({
+          questions,
+          activeMode,
+          profile: workspace.profile ?? null,
+          targetRole: activeTargetRole,
+          jobTarget: workspace.jobTarget ?? null,
+        }),
       };
     },
   };

@@ -15,6 +15,8 @@ import type {
   TranscriptTurnRow,
 } from "@/db/schema";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
+import { buildArtifactSections } from "@/lib/reporting/reporting";
+import { getDefaultInterviewBlueprint } from "@/lib/interview-session/catalog";
 import {
   createReportEvaluatorForRuntime,
   type ReportEvaluation,
@@ -146,6 +148,14 @@ function buildReportFromEvaluation(
   context: ReportGenerationContext,
   evaluation: ReportEvaluation,
 ): InterviewReport {
+  const blueprint = getDefaultInterviewBlueprint({
+    mode: context.session.mode,
+    practiceStyle: context.session.practiceStyle,
+    difficulty: context.session.difficulty,
+    companyStyle: context.session.companyStyle ?? null,
+    questionId: context.session.questionId ?? null,
+  });
+
   return {
     id: context.report?.id ?? randomUUID(),
     title: context.session.title,
@@ -160,6 +170,29 @@ function buildReportFromEvaluation(
     transcript: toTranscriptTurns(context.transcript),
     citations: [...evaluation.citations],
     rewrites: [...evaluation.rewrites],
+    practiceStyle: context.session.practiceStyle,
+    difficulty: context.session.difficulty,
+    companyStyle: context.session.companyStyle ?? null,
+    questionId: context.session.questionId ?? null,
+    questionFamily: blueprint.questionFamily,
+    artifactSections: buildArtifactSections({
+      mode: evaluation.scorecard.mode,
+      summary: evaluation.summary,
+      transcript: toTranscriptTurns(context.transcript),
+      strongestLine: evaluation.summary.strengths[0],
+    }),
+    replayActions: [
+      {
+        label: "Repeat same question",
+        href: `/interview?mode=${context.session.mode}&practiceStyle=${context.session.practiceStyle}&difficulty=${context.session.difficulty}${context.session.companyStyle ? `&companyStyle=${context.session.companyStyle}` : ""}${context.session.questionId ? `&questionId=${context.session.questionId}` : ""}`,
+        description: "Run the exact same question again and measure whether the next answer improves.",
+      },
+      {
+        label: "Rotate similar question",
+        href: `/interview?mode=${context.session.mode}&practiceStyle=${context.session.practiceStyle}&difficulty=${context.session.difficulty}${context.session.companyStyle ? `&companyStyle=${context.session.companyStyle}` : ""}${blueprint.rotationQuestionIds[0] ? `&questionId=${blueprint.rotationQuestionIds[0]}` : context.session.questionId ? `&questionId=${context.session.questionId}` : ""}`,
+        description: "Switch to a nearby question family and keep the same track pressure.",
+      },
+    ],
     practicePlan: {
       title: evaluation.practicePlan.title,
       focus: evaluation.practicePlan.focus,

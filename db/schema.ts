@@ -16,20 +16,25 @@ import type {
   CitationBlock,
   InterviewReport,
 } from "@/lib/reporting/types";
-import type { Scorecard } from "@/lib/types/interview";
+import type { StoredScorecard } from "@/lib/types/interview";
 
 export type InterviewMode =
   | "behavioral"
+  | "coding"
   | "resume"
   | "project"
   | "system-design";
 
-export type RubricKey =
-  | "clarity"
-  | "ownership"
-  | "technical-depth"
-  | "communication"
-  | "systems-thinking";
+export type PracticeStyle = "guided" | "live";
+export type InterviewDifficulty = "standard" | "challenging" | "stretch";
+export type CompanyStyle =
+  | "general"
+  | "amazon"
+  | "google"
+  | "meta"
+  | "stripe";
+
+export type RubricKey = string;
 
 export type SessionStatus = "draft" | "active" | "paused" | "completed" | "archived";
 export type TranscriptSpeaker = "interviewer" | "candidate";
@@ -119,8 +124,18 @@ export const rubricDimensions = pgTable("rubric_dimensions", {
 export const questionBank = pgTable("question_bank", {
   id: uuid("id").primaryKey().defaultRandom(),
   mode: text("mode").$type<InterviewMode>().notNull(),
+  title: text("title").notNull(),
   prompt: text("prompt").notNull(),
   followUps: jsonb("follow_ups").$type<readonly string[]>(),
+  questionFamily: text("question_family").notNull(),
+  difficulty: text("difficulty")
+    .$type<InterviewDifficulty>()
+    .notNull()
+    .default("standard"),
+  companyTags: jsonb("company_tags").$type<readonly CompanyStyle[]>(),
+  interviewerGoal: text("interviewer_goal").notNull(),
+  followUpPolicy: text("follow_up_policy").notNull(),
+  coachingOutline: jsonb("coaching_outline").$type<readonly string[]>(),
   rubricKeys: jsonb("rubric_keys").$type<readonly RubricKey[]>(),
   sourceTag: text("source_tag").notNull(),
   orderIndex: integer("order_index").notNull().default(0),
@@ -135,6 +150,16 @@ export const interviewSessions = pgTable(
       .notNull()
       .references(() => targetRoles.id, { onDelete: "cascade" }),
     mode: text("mode").$type<InterviewMode>().notNull(),
+    practiceStyle: text("practice_style")
+      .$type<PracticeStyle>()
+      .notNull()
+      .default("live"),
+    difficulty: text("difficulty")
+      .$type<InterviewDifficulty>()
+      .notNull()
+      .default("standard"),
+    companyStyle: text("company_style").$type<CompanyStyle>(),
+    questionId: text("question_id"),
     status: text("status").$type<SessionStatus>().notNull().default("draft"),
     title: text("title").notNull(),
     overallScore: integer("overall_score"),
@@ -155,7 +180,19 @@ export const interviewSessions = pgTable(
     index("interview_sessions_target_role_id_idx").on(table.targetRoleId),
     check(
       "interview_sessions_mode_check",
-      sql`${table.mode} in ('behavioral', 'resume', 'project', 'system-design')`,
+      sql`${table.mode} in ('behavioral', 'coding', 'resume', 'project', 'system-design')`,
+    ),
+    check(
+      "interview_sessions_practice_style_check",
+      sql`${table.practiceStyle} in ('guided', 'live')`,
+    ),
+    check(
+      "interview_sessions_difficulty_check",
+      sql`${table.difficulty} in ('standard', 'challenging', 'stretch')`,
+    ),
+    check(
+      "interview_sessions_company_style_check",
+      sql`${table.companyStyle} is null or ${table.companyStyle} in ('general', 'amazon', 'google', 'meta', 'stripe')`,
     ),
     check(
       "interview_sessions_status_check",
@@ -249,7 +286,7 @@ export const feedbackReports = pgTable(
       onDelete: "set null",
     }),
     summary: text("summary").notNull(),
-    scorecard: jsonb("scorecard").$type<Scorecard>().notNull(),
+    scorecard: jsonb("scorecard").$type<StoredScorecard>().notNull(),
     strengths: jsonb("strengths").$type<readonly string[]>(),
     gaps: jsonb("gaps").$type<readonly string[]>(),
     citations: jsonb("citations").$type<readonly CitationBlock[]>(),

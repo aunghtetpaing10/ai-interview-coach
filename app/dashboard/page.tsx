@@ -70,6 +70,7 @@ export default async function DashboardPage() {
     : null;
   const model = buildDashboardReadModel({
     workspace,
+    sessions,
     reportOverviews,
     latestReport,
     reportWorkflow:
@@ -98,6 +99,12 @@ export default async function DashboardPage() {
       ? "Open latest report"
       : "View reports";
   const candidateLabel = workspace.profile?.fullName ?? user.email ?? "Candidate";
+  const guidedHref =
+    model.nextRecommendedQuestion?.href ??
+    `/interview?mode=${workspace.activeMode}&practiceStyle=guided&difficulty=standard`;
+  const liveHref = model.nextRecommendedQuestion
+    ? model.nextRecommendedQuestion.href.replace("practiceStyle=guided", "practiceStyle=live")
+    : `/interview?mode=${workspace.activeMode}&practiceStyle=live&difficulty=challenging`;
 
   return (
     <CandidateShell
@@ -128,7 +135,7 @@ export default async function DashboardPage() {
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Link
-                      href="/interview"
+                      href={guidedHref}
                       className={cn(
                         buttonVariants({
                           className:
@@ -136,11 +143,11 @@ export default async function DashboardPage() {
                         }),
                       )}
                     >
-                      Start live interview
+                      Start guided drill
                       <ArrowRight className="size-4" />
                     </Link>
                     <Link
-                      href={latestReportHref}
+                      href={liveHref}
                       className={cn(
                         buttonVariants({
                           variant: "outline",
@@ -149,7 +156,8 @@ export default async function DashboardPage() {
                         }),
                       )}
                     >
-                      {latestReportLabel}
+                      Start live mock
+                      <ArrowRight className="size-4" />
                     </Link>
                   </div>
                 </div>
@@ -169,14 +177,30 @@ export default async function DashboardPage() {
                     </div>
                     <div className="rounded-[24px] border border-white/10 bg-black/10 p-4">
                       <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-white/60">
-                        Active mode
+                        Next recommended question
                       </p>
-                      <p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
-                        {model.activeModeLabel}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-white/70">
-                        {model.nextDrillDescription}
-                      </p>
+                      {model.nextRecommendedQuestion ? (
+                        <>
+                          <p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
+                            {model.nextRecommendedQuestion.title}
+                          </p>
+                          <p className="mt-2 text-sm text-white/60">
+                            {model.nextRecommendedQuestion.modeLabel} | {model.nextRecommendedQuestion.difficultyLabel}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-white/70">
+                            {model.nextRecommendedQuestion.prompt}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
+                            {model.activeModeLabel}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-white/70">
+                            {model.nextDrillDescription}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </CardHeader>
                 </Card>
@@ -230,7 +254,7 @@ export default async function DashboardPage() {
                         }),
                       )}
                     >
-                      {model.reportWorkflow ? "Track" : "Review"}
+                      {model.reportWorkflow ? "Track" : latestReportLabel}
                     </Link>
                   </div>
                 </div>
@@ -361,17 +385,21 @@ export default async function DashboardPage() {
                           variant="secondary"
                           className="rounded-full bg-[#e7d9c7] text-[#1b3958]"
                         >
-                          {scorecard.competencies[0]?.score ?? 0} lead signal
+                          {scorecard.averageScore}% | {scorecard.readiness}
                         </Badge>
                       </div>
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        {scorecard.coachingBody}
+                      </p>
                       <div className="mt-5 space-y-4">
-                        {scorecard.competencies.slice(0, 3).map((competency) => (
-                          <div key={competency.label} className="space-y-2">
+                        {scorecard.dimensions.slice(0, 3).map((dimension) => (
+                          <div key={dimension.label} className="space-y-2">
                             <div className="flex items-center justify-between text-sm text-slate-600">
-                              <span>{competency.label}</span>
-                              <span>{competency.score}%</span>
+                              <span>{dimension.label}</span>
+                              <span>{dimension.score}%</span>
                             </div>
-                            <Progress value={competency.score} className="h-2.5" />
+                            <Progress value={dimension.score} className="h-2.5" />
+                            <p className="text-xs leading-5 text-slate-500">{dimension.note}</p>
                           </div>
                         ))}
                       </div>
@@ -468,15 +496,17 @@ export default async function DashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {model.questionPreview.map((question) => (
-                    <div
+                    <Link
                       key={question.id}
+                      href={question.href}
                       className="rounded-[24px] border border-[#1b3958]/10 bg-white/75 p-4"
                     >
                       <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#1b3958]/60">
-                        {question.modeLabel}
+                        {question.modeLabel} | {question.difficultyLabel}
                       </p>
+                      <p className="mt-2 text-base font-semibold text-[#122033]">{question.title}</p>
                       <p className="mt-2 text-sm leading-6 text-slate-700">{question.prompt}</p>
-                    </div>
+                    </Link>
                   ))}
                 </CardContent>
               </Card>

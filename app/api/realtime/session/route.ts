@@ -9,12 +9,27 @@ import {
 } from "@/lib/openai/realtime-session";
 import { buildRateLimitResponse } from "@/lib/rate-limit/http";
 import { evaluateRateLimit, getRequestIp } from "@/lib/rate-limit/upstash";
+import {
+  companyStyleSchema,
+  interviewDifficultySchema,
+  interviewModeSchema,
+  practiceStyleSchema,
+} from "@/lib/session-service/validation";
 
 const realtimeSessionRequestSchema = z.object({
   candidateName: z.string().trim().min(1),
   targetRole: z.string().trim().min(1),
-  mode: z.enum(["behavioral", "resume", "project", "system-design"]),
+  mode: interviewModeSchema,
+  practiceStyle: practiceStyleSchema,
+  difficulty: interviewDifficultySchema,
+  companyStyle: companyStyleSchema.nullable(),
+  questionId: z.string().trim().min(1),
+  questionTitle: z.string().trim().min(1),
+  stageIndex: z.number().int().nonnegative(),
+  stageLabel: z.string().trim().min(1),
   focus: z.string().trim().min(1),
+  interviewerGoal: z.string().trim().min(1),
+  followUpPolicy: z.string().trim().min(1),
   openingPrompt: z.string().trim().min(1),
 });
 

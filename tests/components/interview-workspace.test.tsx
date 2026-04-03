@@ -42,7 +42,9 @@ describe("InterviewWorkspace", () => {
     await user.click(screen.getByRole("tab", { name: /behavioral/i }));
 
     expect(screen.getAllByText(/inherited something messy/i)[0]).toBeInTheDocument();
-    expect(pushMock).toHaveBeenCalledWith("/interview?mode=behavioral");
+    expect(pushMock).toHaveBeenCalledWith(
+      "/interview?mode=behavioral&practiceStyle=live&difficulty=challenging",
+    );
   });
 
   it(
@@ -90,7 +92,7 @@ describe("InterviewWorkspace", () => {
     );
     expect(connectBrowserRealtimeSessionMock).toHaveBeenCalledTimes(1);
 
-    const draftAreas = screen.getAllByPlaceholderText(/draft your answer to/i);
+    const draftAreas = screen.getAllByPlaceholderText(/respond to/i);
 
     await user.type(
       draftAreas[0],
@@ -108,7 +110,9 @@ describe("InterviewWorkspace", () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.getAllByText(/hardest bottlenecks and why/i)[0]).toBeInTheDocument(),
+      expect(
+        screen.getAllByText(/non-negotiable constraints and scale assumptions/i)[0],
+      ).toBeInTheDocument(),
     );
   });
 

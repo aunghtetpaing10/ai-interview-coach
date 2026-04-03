@@ -1,11 +1,25 @@
-import type { InterviewMode } from "@/lib/types/interview";
+import type {
+  CompanyStyle,
+  InterviewDifficulty,
+  InterviewMode,
+  PracticeStyle,
+} from "@/lib/types/interview";
 import type { RealtimeSessionSnapshot } from "@/lib/interview-session/types";
 
 export interface BrowserRealtimeSessionInput {
   candidateName: string;
   targetRole: string;
   mode: InterviewMode;
+  practiceStyle: PracticeStyle;
+  difficulty: InterviewDifficulty;
+  companyStyle: CompanyStyle | null;
+  questionId: string;
+  questionTitle: string;
+  stageIndex: number;
+  stageLabel: string;
   focus: string;
+  interviewerGoal: string;
+  followUpPolicy: string;
   openingPrompt: string;
 }
 
@@ -44,7 +58,16 @@ export function buildBrowserRealtimeSessionRequest(
     candidateName: input.candidateName,
     targetRole: input.targetRole,
     mode: input.mode,
+    practiceStyle: input.practiceStyle,
+    difficulty: input.difficulty,
+    companyStyle: input.companyStyle,
+    questionId: input.questionId,
+    questionTitle: input.questionTitle,
+    stageIndex: input.stageIndex,
+    stageLabel: input.stageLabel,
     focus: input.focus,
+    interviewerGoal: input.interviewerGoal,
+    followUpPolicy: input.followUpPolicy,
     openingPrompt: input.openingPrompt,
   };
 }

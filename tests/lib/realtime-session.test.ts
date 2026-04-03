@@ -5,15 +5,15 @@ import {
   buildRealtimeSessionCreateParams,
   createRealtimeClientSecret,
 } from "@/lib/openai/realtime-session";
+import { makeRealtimeInput } from "@/tests/helpers/factories";
 
 describe("realtime session helpers", () => {
-  const input = {
-    candidateName: "Aung",
+  const input = makeRealtimeInput({
     targetRole: "Backend Software Engineer",
-    mode: "system-design" as const,
     focus: "service decomposition and scaling tradeoffs",
+    questionTitle: "Talk me through a system you have owned end-to-end.",
     openingPrompt: "Talk me through a system you have owned end-to-end.",
-  };
+  });
 
   it("builds a structured interviewer prompt", () => {
     const instructions = buildRealtimeInstructions(input);
@@ -23,6 +23,7 @@ describe("realtime session helpers", () => {
     expect(instructions).toContain("System design");
     expect(instructions).toContain("service decomposition and scaling tradeoffs");
     expect(instructions).toContain("Talk me through a system you have owned end-to-end.");
+    expect(instructions).toContain("Practice style: Live mock.");
   });
 
   it("builds a browser-safe realtime session configuration", () => {

@@ -2,9 +2,26 @@ import { z } from "zod";
 
 export const interviewModeSchema = z.enum([
   "behavioral",
+  "coding",
   "resume",
   "project",
   "system-design",
+]);
+
+export const practiceStyleSchema = z.enum(["guided", "live"]);
+
+export const interviewDifficultySchema = z.enum([
+  "standard",
+  "challenging",
+  "stretch",
+]);
+
+export const companyStyleSchema = z.enum([
+  "general",
+  "amazon",
+  "google",
+  "meta",
+  "stripe",
 ]);
 
 export const transcriptSpeakerSchema = z.enum([
@@ -15,6 +32,10 @@ export const transcriptSpeakerSchema = z.enum([
 export const createInterviewSessionRequestSchema = z.object({
   targetRoleId: z.string().trim().min(1),
   mode: interviewModeSchema,
+  practiceStyle: practiceStyleSchema.default("live"),
+  difficulty: interviewDifficultySchema.default("standard"),
+  companyStyle: companyStyleSchema.optional(),
+  questionId: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1).optional(),
   durationSeconds: z.number().int().nonnegative().optional(),
 });

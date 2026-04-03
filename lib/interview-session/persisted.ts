@@ -1,4 +1,4 @@
-import { getInterviewModePreset } from "@/lib/interview-session/catalog";
+import { getDefaultInterviewBlueprint } from "@/lib/interview-session/catalog";
 import { createInterviewSessionState } from "@/lib/interview-session/session";
 import type {
   InterviewSessionState,
@@ -22,12 +22,19 @@ export function buildInterviewSessionStateFromView(input: {
   targetRole: string;
   realtime: RealtimeSessionSnapshot;
 }): InterviewSessionState {
+  const blueprint = getDefaultInterviewBlueprint({
+    mode: input.view.session.mode,
+    practiceStyle: input.view.session.practiceStyle,
+    difficulty: input.view.session.difficulty,
+    companyStyle: input.view.session.companyStyle ?? null,
+    questionId: input.view.session.questionId ?? null,
+  });
   const baseState = createInterviewSessionState(
     {
       sessionId: input.view.session.id,
       candidateName: input.candidateName,
       targetRole: input.targetRole,
-      mode: input.view.session.mode,
+      blueprint,
       durationSeconds: input.view.session.durationSeconds,
     },
     input.realtime,
@@ -45,7 +52,7 @@ export function buildInterviewSessionStateFromView(input: {
     .reverse()
     .find((turn) => turn.speaker === "interviewer");
   const elapsedSeconds = input.view.transcriptTurns.at(-1)?.seconds ?? 0;
-  const fallbackPrompt = getInterviewModePreset(input.view.session.mode).openingPrompt;
+  const stageIndex = Math.max(0, interviewerTurnCount - 1);
 
   return {
     ...baseState,
@@ -55,11 +62,11 @@ export function buildInterviewSessionStateFromView(input: {
       persistedTranscript.length > 0
         ? [baseState.transcript[0]!, ...persistedTranscript]
         : baseState.transcript,
-    questionIndex: Math.max(0, interviewerTurnCount - 1),
-    activePrompt: lastInterviewerTurn?.body ?? fallbackPrompt,
+    stageIndex: Math.min(stageIndex, Math.max(0, blueprint.stages.length - 1)),
+    activePrompt: lastInterviewerTurn?.body ?? blueprint.openingPrompt,
     connectionMessage:
       input.view.session.status === "completed"
         ? "Session complete. Review the stored transcript and track the background report."
-        : "Persisted session loaded. Start live voice or continue in text fallback.",
+        : "Persisted session loaded. Start live voice or continue the staged drill in text fallback.",
   };
 }

@@ -5,6 +5,7 @@ import {
   connectBrowserRealtimeSession,
   createBrowserRealtimeSnapshot,
 } from "@/lib/openai/browser-realtime";
+import { makeRealtimeInput } from "@/tests/helpers/factories";
 
 describe("browser realtime helper", () => {
   afterEach(() => {
@@ -22,13 +23,7 @@ describe("browser realtime helper", () => {
   });
 
   it("builds the realtime request and connects using the ephemeral token", async () => {
-    const input = {
-      candidateName: "Aung",
-      targetRole: "Platform engineer",
-      mode: "system-design" as const,
-      focus: "capacity and failure domains",
-      openingPrompt: "Design a notification service.",
-    };
+    const input = makeRealtimeInput();
 
     const sessionPayload: RealtimeSessionSecretPayload = {
       provider: "openai",

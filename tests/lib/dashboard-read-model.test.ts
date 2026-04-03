@@ -3,6 +3,11 @@ import type { WorkspaceSnapshot } from "@/lib/data/repository";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
 import type { ProgressDashboardSnapshot } from "@/lib/analytics/progress";
 import { buildDashboardReadModel } from "@/lib/dashboard/read-model";
+import {
+  makeInterviewReport,
+  makeInterviewSessionRow,
+  makeReportOverview as buildReportOverview,
+} from "@/tests/helpers/factories";
 
 function makeWorkspaceSnapshot(): WorkspaceSnapshot {
   return {
@@ -36,47 +41,16 @@ function makeWorkspaceSnapshot(): WorkspaceSnapshot {
 }
 
 function makeReportOverview(): ReportOverview {
-  return {
-    id: "report-1",
-    title: "Queue scaling drill",
-    sessionDate: "March 19, 2026",
-    candidate: "Aung Htet Paing",
-    targetRole: "Platform engineer",
-    promptVersion: "Scorecard v1",
-    scorecard: {
-      mode: "project",
-      overallScore: 84,
-      competencies: {
-        clarity: 84,
-        ownership: 78,
-        "technical-depth": 87,
-        communication: 80,
-        "systems-thinking": 75,
-      },
-    },
-    summary: {
-      score: 84,
-      band: "strong",
-      headline: "Strong and trending up with clear upside in systems thinking.",
-      strengths: ["Technical depth 87%", "Clarity 84%"],
-      growthAreas: ["Systems thinking 75%", "Ownership 78%"],
-    },
-    strengths: ["Technical depth 87%", "Clarity 84%"],
-    growthAreas: ["Systems thinking 75%", "Ownership 78%"],
-  };
+  return buildReportOverview();
 }
 
 function makeLatestReport(): InterviewReport {
-  const overview = makeReportOverview();
-
-  return {
-    ...overview,
+  return makeInterviewReport({
+    ...buildReportOverview(),
     transcript: [],
-    citations: [],
-    rewrites: [],
     practicePlan: {
       title: "Platform engineer practice plan",
-      focus: overview.summary.headline,
+      focus: "Strong and trending up with clear upside in systems thinking.",
       steps: [
         {
           id: "step-1",
@@ -87,7 +61,7 @@ function makeLatestReport(): InterviewReport {
         },
       ],
     },
-  };
+  });
 }
 
 function makeProgressSnapshot(): ProgressDashboardSnapshot {
@@ -159,9 +133,25 @@ function makeProgressSnapshot(): ProgressDashboardSnapshot {
 }
 
 describe("buildDashboardReadModel", () => {
+  const sessions = [
+    makeInterviewSessionRow({
+      id: "session-1",
+      mode: "project",
+      practiceStyle: "guided",
+      status: "completed",
+    }),
+    makeInterviewSessionRow({
+      id: "session-2",
+      mode: "system-design",
+      practiceStyle: "live",
+      status: "completed",
+    }),
+  ];
+
   it("builds a dashboard view from persisted workspace, progress, and reports", () => {
     const model = buildDashboardReadModel({
       workspace: makeWorkspaceSnapshot(),
+      sessions,
       reportOverviews: [makeReportOverview()],
       latestReport: makeLatestReport(),
       progressSnapshot: makeProgressSnapshot(),
@@ -171,17 +161,18 @@ describe("buildDashboardReadModel", () => {
     expect(model.firstName).toBe("Aung");
     expect(model.activeModeLabel).toBe("System design");
     expect(model.stats[0]?.value).toBe("improving");
-    expect(model.stats[1]?.value).toBe("3");
+    expect(model.stats[1]?.value).toBe("1");
     expect(model.latestSession?.trackLabel).toBe("Project walkthrough");
     expect(model.timeline).toHaveLength(0);
     expect(model.questionPreview).toHaveLength(0);
     expect(model.practicePlan[0]?.title).toBe("Lead with tradeoffs");
-    expect(model.scorecards.find((card) => card.mode === "project")?.competencies[0]?.score).toBeGreaterThan(0);
+    expect(model.scorecards.find((card) => card.mode === "project")?.dimensions[0]?.score).toBeGreaterThan(0);
   });
 
   it("falls back cleanly when the user has no completed reports yet", () => {
     const model = buildDashboardReadModel({
       workspace: makeWorkspaceSnapshot(),
+      sessions: [],
       reportOverviews: [],
       latestReport: null,
       progressSnapshot: null,
@@ -191,12 +182,13 @@ describe("buildDashboardReadModel", () => {
     expect(model.stats[1]?.value).toBe("0");
     expect(model.practicePlan).toHaveLength(0);
     expect(model.latestSession).toBeNull();
-    expect(model.heroDescription).toMatch(/save onboarding data/i);
+    expect(model.heroDescription).toMatch(/guided drills and live mocks/i);
   });
 
   it("surfaces a pending report workflow while the latest session is still processing", () => {
     const model = buildDashboardReadModel({
       workspace: makeWorkspaceSnapshot(),
+      sessions,
       reportOverviews: [],
       latestReport: null,
       reportWorkflow: {
@@ -216,12 +208,13 @@ describe("buildDashboardReadModel", () => {
       error: undefined,
     });
     expect(model.nextDrillTitle).toBe("Wait for the latest report");
-    expect(model.stats[2]?.copy).toMatch(/background report job is still processing/i);
+    expect(model.stats[3]?.copy).toMatch(/background report job is still processing/i);
   });
 
   it("surfaces a failed report workflow with a retry path", () => {
     const model = buildDashboardReadModel({
       workspace: makeWorkspaceSnapshot(),
+      sessions,
       reportOverviews: [],
       latestReport: null,
       reportWorkflow: {

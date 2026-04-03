@@ -1,4 +1,9 @@
-import type { InterviewMode } from "@/lib/types/interview";
+import type {
+  CompanyStyle,
+  InterviewDifficulty,
+  InterviewMode,
+  PracticeStyle,
+} from "@/lib/types/interview";
 
 export type InterviewSessionStatus =
   | "idle"
@@ -15,9 +20,37 @@ export interface InterviewModePreset {
   mode: InterviewMode;
   label: string;
   focus: string;
+  summary: string;
+  defaultPracticeStyle: PracticeStyle;
+  defaultDifficulty: InterviewDifficulty;
+  guidedDescription: string;
+  liveDescription: string;
+}
+
+export interface InterviewBlueprintStage {
+  id: string;
+  label: string;
+  prompt: string;
+  interviewerGoal: string;
+  hint: string;
+}
+
+export interface InterviewBlueprint {
+  id: string;
+  questionId: string;
+  questionTitle: string;
+  questionFamily: string;
+  mode: InterviewMode;
+  practiceStyle: PracticeStyle;
+  difficulty: InterviewDifficulty;
+  companyStyle: CompanyStyle | null;
+  interviewerGoal: string;
+  followUpPolicy: string;
+  coachingOutline: string[];
   openingPrompt: string;
-  followUpPrompts: string[];
-  closingPrompt: string;
+  wrapUpPrompt: string;
+  stages: InterviewBlueprintStage[];
+  rotationQuestionIds: string[];
 }
 
 export interface InterviewTranscriptTurn {
@@ -39,7 +72,7 @@ export interface InterviewSessionSeed {
   sessionId: string;
   candidateName: string;
   targetRole: string;
-  mode: InterviewMode;
+  blueprint: InterviewBlueprint;
   durationSeconds?: number;
 }
 
@@ -48,20 +81,27 @@ export interface InterviewSessionState {
   candidateName: string;
   targetRole: string;
   mode: InterviewMode;
+  practiceStyle: PracticeStyle;
+  difficulty: InterviewDifficulty;
+  companyStyle: CompanyStyle | null;
   status: InterviewSessionStatus;
   elapsedSeconds: number;
   durationSeconds: number;
   microphoneEnabled: boolean;
   transcript: InterviewTranscriptTurn[];
-  questionIndex: number;
+  questionId: string;
+  questionTitle: string;
+  questionFamily: string;
+  stageIndex: number;
   draftResponse: string;
   activePrompt: string;
   connectionMessage: string;
   realtime: RealtimeSessionSnapshot;
+  blueprint: InterviewBlueprint;
 }
 
 export type InterviewSessionAction =
-  | { type: "mode-changed"; mode: InterviewMode }
+  | { type: "mode-changed"; blueprint: InterviewBlueprint }
   | { type: "connection-requested" }
   | {
       type: "connection-established";

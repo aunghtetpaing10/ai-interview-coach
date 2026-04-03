@@ -15,13 +15,13 @@ describe("progress helpers", () => {
     const sorted = sortProgressSessions(reversed);
 
     expect(sorted[0].id).toBe("session-01");
-    expect(sorted.at(-1)?.id).toBe("session-09");
+    expect(sorted.at(-1)?.id).toBe("session-10");
   });
 
   it("computes aggregate metrics for the dashboard", () => {
-    expect(averageProgressScore(PROGRESS_SESSIONS)).toBe(76);
-    expect(computeProgressMomentum(PROGRESS_SESSIONS)).toBe(7);
-    expect(computePracticeStreak(PROGRESS_SESSIONS)).toBe(5);
+    expect(averageProgressScore(PROGRESS_SESSIONS)).toBe(77);
+    expect(computeProgressMomentum(PROGRESS_SESSIONS)).toBe(6);
+    expect(computePracticeStreak(PROGRESS_SESSIONS)).toBe(6);
   });
 
   it("builds timeline points and a snapshot", () => {
@@ -38,7 +38,7 @@ describe("progress helpers", () => {
     );
     expect(snapshot.readinessBand).toBe("improving");
     expect(snapshot.weakestTrack.track).toBe("behavioral");
-    expect(snapshot.strongestTrack.track).toBe("system-design");
-    expect(snapshot.latestSession.id).toBe("session-09");
+    expect(snapshot.strongestTrack.track).toBe("project");
+    expect(snapshot.latestSession.id).toBe("session-10");
   });
 });

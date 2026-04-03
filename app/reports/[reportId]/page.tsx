@@ -52,13 +52,13 @@ export default async function Page({
           },
           {
             icon: Sparkles,
-            label: "Answer rewrites",
-            value: `${report.rewrites.length}`,
+            label: "Track artifacts",
+            value: `${report.artifactSections.length}`,
           },
           {
             icon: CalendarDays,
-            label: "Practice steps",
-            value: `${report.practicePlan.steps.length}`,
+            label: "Replay actions",
+            value: `${report.replayActions.length}`,
           },
         ].map((item) => (
           <Card key={item.label} className="curator-card">
@@ -104,6 +104,14 @@ export default async function Page({
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 {report.promptVersion}
+              </p>
+            </div>
+            <div className="rounded-[1.4rem] border border-[color:var(--curator-line)] bg-white/80 p-4">
+              <p className="text-sm font-medium text-[color:var(--curator-ink)]">
+                Question family
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {report.questionFamily ?? "Not set"}
               </p>
             </div>
             <div className="rounded-[1.4rem] border border-[color:var(--curator-line)] bg-white/80 p-4">

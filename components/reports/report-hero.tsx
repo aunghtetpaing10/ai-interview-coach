@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
+import {
+  getCompanyStyleLabel,
+  getInterviewDifficultyLabel,
+  getPracticeStyleLabel,
+} from "@/lib/domain/interview";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { ReportOverview } from "@/lib/reporting/types";
+import type { InterviewReport } from "@/lib/reporting/types";
 
 type ReportHeroProps = {
-  report: ReportOverview;
+  report: InterviewReport;
 };
 
 export function ReportHero({ report }: ReportHeroProps) {
@@ -15,10 +20,23 @@ export function ReportHero({ report }: ReportHeroProps) {
     <Card className="curator-card-dark overflow-hidden">
       <CardHeader className="gap-5 border-b border-white/10">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Badge className="rounded-full bg-white/10 text-white">
-            <Sparkles className="mr-1 size-3" />
-            Latest report detail
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="rounded-full bg-white/10 text-white">
+              <Sparkles className="mr-1 size-3" />
+              Latest report detail
+            </Badge>
+            <Badge className="rounded-full bg-white/10 text-white">
+              {getPracticeStyleLabel(report.practiceStyle)}
+            </Badge>
+            <Badge className="rounded-full bg-white/10 text-white">
+              {getInterviewDifficultyLabel(report.difficulty)}
+            </Badge>
+            {report.companyStyle ? (
+              <Badge className="rounded-full bg-white/10 text-white">
+                {getCompanyStyleLabel(report.companyStyle)}
+              </Badge>
+            ) : null}
+          </div>
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-slate-300">
             Prompt {report.promptVersion}
           </span>

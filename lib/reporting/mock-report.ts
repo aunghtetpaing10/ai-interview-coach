@@ -2,7 +2,9 @@ import {
   REPORT_EVAL_CASES as REPORT_EVAL_CASES_DATA,
   REPORT_PROMPT_FIXTURES as REPORT_PROMPT_FIXTURES_DATA,
 } from "@/lib/evals/fixtures";
+import { getModeRubricVersion } from "@/lib/domain/interview";
 import {
+  buildArtifactSections,
   buildCitationBlocks,
   generatePracticePlan,
   rewriteAnswerDraft,
@@ -28,6 +30,11 @@ type ReportSeed = {
   signals: CitationSignal[];
   rewrites: RewriteInput[];
   focusAreas: string[];
+  practiceStyle: InterviewReport["practiceStyle"];
+  difficulty: InterviewReport["difficulty"];
+  companyStyle: InterviewReport["companyStyle"];
+  questionId: string;
+  questionFamily: string;
 };
 
 function makeReport(seed: ReportSeed): InterviewReport {
@@ -49,6 +56,29 @@ function makeReport(seed: ReportSeed): InterviewReport {
     transcript: seed.transcript,
     citations,
     rewrites,
+    practiceStyle: seed.practiceStyle,
+    difficulty: seed.difficulty,
+    companyStyle: seed.companyStyle,
+    questionId: seed.questionId,
+    questionFamily: seed.questionFamily,
+    artifactSections: buildArtifactSections({
+      mode: seed.scorecard.mode,
+      summary,
+      transcript: seed.transcript,
+      strongestLine: summary.strengths[0],
+    }),
+    replayActions: [
+      {
+        label: "Repeat same question",
+        href: `/interview?mode=${seed.scorecard.mode}&practiceStyle=${seed.practiceStyle}&difficulty=${seed.difficulty}&questionId=${seed.questionId}`,
+        description: "Run the exact same prompt again and compare the next answer against this report.",
+      },
+      {
+        label: "Rotate similar question",
+        href: `/interview?mode=${seed.scorecard.mode}&practiceStyle=${seed.practiceStyle}&difficulty=${seed.difficulty}`,
+        description: "Stay in the same track but move to a neighboring question family.",
+      },
+    ],
     practicePlan: generatePracticePlan({
       targetRole: seed.targetRole,
       scorecard: seed.scorecard,
@@ -58,24 +88,38 @@ function makeReport(seed: ReportSeed): InterviewReport {
   };
 }
 
+function createScorecard(
+  mode: Scorecard["mode"],
+  overallScore: number,
+  dimensions: Scorecard["dimensions"],
+): Scorecard {
+  return {
+    mode,
+    overallScore,
+    rubricVersion: getModeRubricVersion(mode),
+    dimensions,
+  };
+}
+
 const report042 = makeReport({
   id: "report-042",
   title: "Live interview report: payments platform",
   sessionDate: "March 19, 2026",
   candidate: "Aung Paing",
   targetRole: "Mid-level software engineer",
-  promptVersion: "report-rubric-v1",
-  scorecard: {
-    mode: "project",
-    overallScore: 83,
-    competencies: {
-      clarity: 84,
-      ownership: 78,
-      "technical-depth": 87,
-      communication: 80,
-      "systems-thinking": 75,
-    },
-  },
+  promptVersion: "report-rubric-v2",
+  practiceStyle: "live",
+  difficulty: "challenging",
+  companyStyle: "stripe",
+  questionId: "project-payments-scale",
+  questionFamily: "payments-ownership",
+  scorecard: createScorecard("project", 83, [
+    { key: "credibility", label: "Credibility", score: 82, evidenceSummary: "The queue migration details sound firsthand." },
+    { key: "scope", label: "Scope", score: 79, evidenceSummary: "The answer names ownership, but the team boundary could be tighter." },
+    { key: "decision-quality", label: "Decision quality", score: 86, evidenceSummary: "The candidate explains why Kafka fit the retry problem." },
+    { key: "technical-depth", label: "Technical depth", score: 88, evidenceSummary: "Rollback and backpressure concerns are grounded in real implementation detail." },
+    { key: "impact", label: "Impact", score: 80, evidenceSummary: "The answer hints at reliability gains and should quantify them earlier." },
+  ]),
   transcript: [
     {
       id: "turn-1",
@@ -128,7 +172,7 @@ const report042 = makeReport({
       weakness: "It did not explain the tradeoff clearly",
     },
   ],
-  focusAreas: ["systems thinking"],
+  focusAreas: ["scope", "impact"],
 });
 
 const report041 = makeReport({
@@ -137,18 +181,20 @@ const report041 = makeReport({
   sessionDate: "March 18, 2026",
   candidate: "Aung Paing",
   targetRole: "Backend engineer",
-  promptVersion: "report-rubric-v1",
-  scorecard: {
-    mode: "system-design",
-    overallScore: 76,
-    competencies: {
-      clarity: 72,
-      ownership: 74,
-      "technical-depth": 81,
-      communication: 70,
-      "systems-thinking": 79,
-    },
-  },
+  promptVersion: "report-rubric-v2",
+  practiceStyle: "live",
+  difficulty: "challenging",
+  companyStyle: "general",
+  questionId: "system-design-profile-cache",
+  questionFamily: "cache-consistency",
+  scorecard: createScorecard("system-design", 76, [
+    { key: "requirements", label: "Requirements", score: 72, evidenceSummary: "The candidate starts with cache behavior, not workload assumptions." },
+    { key: "architecture", label: "Architecture", score: 81, evidenceSummary: "The main design path is coherent and easy to follow." },
+    { key: "api-data-model", label: "API and data model", score: 74, evidenceSummary: "The invalidation contract is present but not explicit enough." },
+    { key: "scalability", label: "Scalability", score: 79, evidenceSummary: "The answer mentions consistency pressure and staleness." },
+    { key: "reliability", label: "Reliability", score: 71, evidenceSummary: "The failure path still needs clearer degraded behavior." },
+    { key: "trade-offs", label: "Trade-offs", score: 77, evidenceSummary: "TTL versus event-driven invalidation is compared directly." },
+  ]),
   transcript: [
     {
       id: "turn-1",
@@ -195,27 +241,28 @@ const report041 = makeReport({
       weakness: "It did not explain stale reads or fallback behavior",
     },
   ],
-  focusAreas: ["technical depth"],
+  focusAreas: ["requirements", "reliability"],
 });
 
 const report040 = makeReport({
   id: "report-040",
-  title: "Live interview report: launch retrospective",
+  title: "Guided drill report: launch retrospective",
   sessionDate: "March 17, 2026",
   candidate: "Aung Paing",
   targetRole: "Mid-level software engineer",
-  promptVersion: "report-rubric-v1",
-  scorecard: {
-    mode: "behavioral",
-    overallScore: 68,
-    competencies: {
-      clarity: 71,
-      ownership: 63,
-      "technical-depth": 66,
-      communication: 74,
-      "systems-thinking": 64,
-    },
-  },
+  promptVersion: "report-rubric-v2",
+  practiceStyle: "guided",
+  difficulty: "standard",
+  companyStyle: "amazon",
+  questionId: "behavioral-launch-regression",
+  questionFamily: "launch-recovery",
+  scorecard: createScorecard("behavioral", 68, [
+    { key: "structure", label: "Structure", score: 71, evidenceSummary: "The answer has a basic sequence but not a clean STAR spine." },
+    { key: "ownership", label: "Ownership", score: 63, evidenceSummary: "The story still uses 'we' when the interviewer needs direct ownership." },
+    { key: "impact", label: "Impact", score: 66, evidenceSummary: "The result is acknowledged but not quantified." },
+    { key: "communication", label: "Communication", score: 74, evidenceSummary: "The delivery is calm and understandable." },
+    { key: "adaptability", label: "Adaptability", score: 64, evidenceSummary: "The follow-up answer recognizes the missing proof too late." },
+  ]),
   transcript: [
     {
       id: "turn-1",
@@ -262,27 +309,25 @@ const report040 = makeReport({
       weakness: "It blurred my responsibility with the team effort",
     },
   ],
-  focusAreas: ["ownership", "clarity"],
+  focusAreas: ["ownership", "impact"],
 });
 
 export const REPORTS = [report042, report041, report040] as const;
 
 export const FEATURED_REPORT = REPORTS[0];
 
-export const REPORT_OVERVIEWS: readonly ReportOverview[] = REPORTS.map(
-  (report) => ({
-    id: report.id,
-    title: report.title,
-    sessionDate: report.sessionDate,
-    candidate: report.candidate,
-    targetRole: report.targetRole,
-    promptVersion: report.promptVersion,
-    scorecard: report.scorecard,
-    summary: report.summary,
-    strengths: report.strengths,
-    growthAreas: report.growthAreas,
-  }),
-);
+export const REPORT_OVERVIEWS: readonly ReportOverview[] = REPORTS.map((report) => ({
+  id: report.id,
+  title: report.title,
+  sessionDate: report.sessionDate,
+  candidate: report.candidate,
+  targetRole: report.targetRole,
+  promptVersion: report.promptVersion,
+  scorecard: report.scorecard,
+  summary: report.summary,
+  strengths: report.strengths,
+  growthAreas: report.growthAreas,
+}));
 
 export function getReportById(reportId: string) {
   return REPORTS.find((report) => report.id === reportId);

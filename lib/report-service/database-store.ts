@@ -23,10 +23,12 @@ import {
   transcriptTurns,
 } from "@/db/schema";
 import { getDb } from "@/lib/db/client";
-import { generatePracticePlan, summarizeScorecard } from "@/lib/reporting/reporting";
+import { normalizeScorecard } from "@/lib/domain/interview";
+import { buildArtifactSections, generatePracticePlan, summarizeScorecard } from "@/lib/reporting/reporting";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
 import type { ReportGenerationContext, ReportJobStore, ReportStore } from "@/lib/report-service/report-service";
 import type { TranscriptTurn } from "@/lib/types/interview";
+import { getDefaultInterviewBlueprint } from "@/lib/interview-session/catalog";
 
 type DbMutationClient = Pick<ReturnType<typeof getDb>, "select" | "insert" | "update">;
 
@@ -79,7 +81,7 @@ function mapOverview(row: {
     candidate: row.profile?.fullName ?? "Candidate",
     targetRole: row.targetRole.title,
     promptVersion: row.promptVersion?.label ?? "Generated prompt",
-    scorecard: row.report.scorecard,
+    scorecard: normalizeScorecard(row.report.scorecard),
     summary,
     strengths: [...(row.report.strengths ?? summary.strengths)],
     growthAreas: [...(row.report.gaps ?? summary.growthAreas)],
@@ -111,11 +113,41 @@ function mapReportDetail(row: {
 
   const overview = mapOverview(row);
   const transcript = toTranscriptTurns(row.transcript);
+  const blueprint = getDefaultInterviewBlueprint({
+    mode: row.session.mode,
+    practiceStyle: row.session.practiceStyle,
+    difficulty: row.session.difficulty,
+    companyStyle: row.session.companyStyle ?? null,
+    questionId: row.session.questionId ?? null,
+  });
   const report: InterviewReport = {
     ...overview,
     transcript,
     citations: [...(row.report.citations ?? [])],
     rewrites: [...(row.report.rewrites ?? [])],
+    practiceStyle: row.session.practiceStyle,
+    difficulty: row.session.difficulty,
+    companyStyle: row.session.companyStyle ?? null,
+    questionId: row.session.questionId ?? null,
+    questionFamily: blueprint.questionFamily,
+    artifactSections: buildArtifactSections({
+      mode: overview.scorecard.mode,
+      summary: overview.summary,
+      transcript,
+      strongestLine: overview.summary.strengths[0],
+    }),
+    replayActions: [
+      {
+        label: "Repeat same question",
+        href: `/interview?mode=${row.session.mode}&practiceStyle=${row.session.practiceStyle}&difficulty=${row.session.difficulty}${row.session.companyStyle ? `&companyStyle=${row.session.companyStyle}` : ""}${row.session.questionId ? `&questionId=${row.session.questionId}` : ""}`,
+        description: "Run the same question again and compare the next answer with this report.",
+      },
+      {
+        label: "Rotate similar question",
+        href: `/interview?mode=${row.session.mode}&practiceStyle=${row.session.practiceStyle}&difficulty=${row.session.difficulty}${row.session.companyStyle ? `&companyStyle=${row.session.companyStyle}` : ""}${blueprint.rotationQuestionIds[0] ? `&questionId=${blueprint.rotationQuestionIds[0]}` : row.session.questionId ? `&questionId=${row.session.questionId}` : ""}`,
+        description: "Stay in the same track but switch to a nearby question family.",
+      },
+    ],
     practicePlan: generatePracticePlan({
       targetRole: overview.targetRole,
       scorecard: overview.scorecard,

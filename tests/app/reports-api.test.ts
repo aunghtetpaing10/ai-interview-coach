@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InterviewReport, ReportOverview } from "@/lib/reporting/types";
+import { makeInterviewReport, makeReportOverview } from "@/tests/helpers/factories";
 
 const getWorkspaceUserMock = vi.hoisted(() => vi.fn());
 const createWorkspaceReportStoreMock = vi.hoisted(() => vi.fn());
@@ -39,53 +40,15 @@ describe("report api routes", () => {
     vi.clearAllMocks();
   });
 
-  const reportOverview: ReportOverview = {
-    id: "report-1",
-    title: "Queue scaling drill",
-    sessionDate: "March 19, 2026",
-    candidate: "Aung Paing",
-    targetRole: "Platform engineer",
-    promptVersion: "report-rubric-v1",
-    scorecard: {
-      mode: "project",
-      overallScore: 84,
-      competencies: {
-        clarity: 84,
-        ownership: 78,
-        "technical-depth": 87,
-        communication: 80,
-        "systems-thinking": 75,
-      },
-    },
-    summary: {
-      score: 84,
-      band: "strong",
-      headline: "Strong and trending up with clear upside in systems thinking.",
-      strengths: ["Technical depth 87%", "Clarity 84%"],
-      growthAreas: ["Systems thinking 75%", "Ownership 78%"],
-    },
-    strengths: ["Technical depth 87%", "Clarity 84%"],
-    growthAreas: ["Systems thinking 75%", "Ownership 78%"],
-  };
-
-  const reportDetail: InterviewReport = {
+  const reportOverview: ReportOverview = makeReportOverview();
+  const reportDetail: InterviewReport = makeInterviewReport({
     ...reportOverview,
-    transcript: [
-      {
-        id: "turn-1",
-        speaker: "candidate",
-        text: "I owned the retry policy and moved the queue onto Kafka.",
-        timestampSeconds: 29,
-      },
-    ],
-    citations: [],
-    rewrites: [],
     practicePlan: {
       title: "Platform engineer practice plan",
       focus: reportOverview.summary.headline,
       steps: [],
     },
-  };
+  });
 
   it("returns a 401 when the list endpoint has no authenticated user", async () => {
     getWorkspaceUserMock.mockResolvedValue(null);

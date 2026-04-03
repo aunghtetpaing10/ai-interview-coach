@@ -1,6 +1,6 @@
 import { getInterviewModeLabel } from "@/lib/domain/interview";
-import { getInterviewModePreset } from "@/lib/interview-session/catalog";
 import type {
+  InterviewBlueprint,
   InterviewSessionAction,
   InterviewSessionSeed,
   InterviewSessionState,
@@ -35,8 +35,6 @@ function createSeedTranscript(
   seed: InterviewSessionSeed,
   realtime: RealtimeSessionSnapshot,
 ) {
-  const preset = getInterviewModePreset(seed.mode);
-
   const transcript: InterviewTranscriptTurn[] = [
     {
       id: buildTranscriptId(seed.sessionId, "system", 0),
@@ -51,7 +49,7 @@ function createSeedTranscript(
     {
       id: buildTranscriptId(seed.sessionId, "interviewer", 1),
       speaker: "interviewer",
-      text: preset.openingPrompt,
+      text: seed.blueprint.openingPrompt,
       elapsedSeconds: 8,
     },
   ];
@@ -63,26 +61,31 @@ export function createInterviewSessionState(
   seed: InterviewSessionSeed,
   realtime: RealtimeSessionSnapshot,
 ): InterviewSessionState {
-  const preset = getInterviewModePreset(seed.mode);
-
   return {
     sessionId: seed.sessionId,
     candidateName: seed.candidateName,
     targetRole: seed.targetRole,
-    mode: seed.mode,
+    mode: seed.blueprint.mode,
+    practiceStyle: seed.blueprint.practiceStyle,
+    difficulty: seed.blueprint.difficulty,
+    companyStyle: seed.blueprint.companyStyle,
     status: "idle",
     elapsedSeconds: 0,
     durationSeconds: seed.durationSeconds ?? 18 * 60,
     microphoneEnabled: true,
     transcript: createSeedTranscript(seed, realtime),
-    questionIndex: 0,
+    questionId: seed.blueprint.questionId,
+    questionTitle: seed.blueprint.questionTitle,
+    questionFamily: seed.blueprint.questionFamily,
+    stageIndex: 0,
     draftResponse: "",
-    activePrompt: preset.openingPrompt,
+    activePrompt: seed.blueprint.openingPrompt,
     connectionMessage:
       realtime.provider === "mock"
         ? "Mock realtime transport is active and ready to simulate a live call."
         : "Realtime transport is configured and waiting for a live session.",
     realtime,
+    blueprint: seed.blueprint,
   };
 }
 
@@ -106,27 +109,48 @@ function appendTranscriptTurn(
   };
 }
 
-function buildNextQuestion(state: InterviewSessionState) {
-  const preset = getInterviewModePreset(state.mode);
-  const nextPrompt =
-    preset.followUpPrompts[state.questionIndex] ?? preset.closingPrompt;
+function getNextBlueprintPrompt(
+  blueprint: InterviewBlueprint,
+  stageIndex: number,
+) {
+  const nextStage = blueprint.stages[stageIndex + 1];
+
+  if (!nextStage) {
+    return {
+      nextStageIndex: blueprint.stages.length - 1,
+      nextPrompt: blueprint.wrapUpPrompt,
+    };
+  }
+
+  return {
+    nextStageIndex: stageIndex + 1,
+    nextPrompt: nextStage.prompt,
+  };
+}
+
+function advanceStage(state: InterviewSessionState) {
+  const { nextStageIndex, nextPrompt } = getNextBlueprintPrompt(
+    state.blueprint,
+    state.stageIndex,
+  );
 
   return {
     ...state,
-    questionIndex: state.questionIndex + 1,
+    stageIndex: nextStageIndex,
     activePrompt: nextPrompt,
   };
 }
 
-function resetForMode(
+function resetForBlueprint(
   state: InterviewSessionState,
-  mode: InterviewSessionState["mode"],
+  blueprint: InterviewBlueprint,
 ) {
-  const preset = getInterviewModePreset(mode);
-
   return {
     ...state,
-    mode,
+    mode: blueprint.mode,
+    practiceStyle: blueprint.practiceStyle,
+    difficulty: blueprint.difficulty,
+    companyStyle: blueprint.companyStyle,
     status: "idle" as const,
     elapsedSeconds: 0,
     microphoneEnabled: true,
@@ -135,18 +159,22 @@ function resetForMode(
         sessionId: state.sessionId,
         candidateName: state.candidateName,
         targetRole: state.targetRole,
-        mode,
+        blueprint,
         durationSeconds: state.durationSeconds,
       },
       state.realtime,
     ),
-    questionIndex: 0,
+    questionId: blueprint.questionId,
+    questionTitle: blueprint.questionTitle,
+    questionFamily: blueprint.questionFamily,
+    stageIndex: 0,
     draftResponse: "",
-    activePrompt: preset.openingPrompt,
+    activePrompt: blueprint.openingPrompt,
     connectionMessage:
       state.realtime.provider === "mock"
-        ? "Mode changed. The mock realtime transport is standing by."
-        : "Mode changed. Realtime transport is standing by.",
+        ? "Practice setup changed. The mock realtime transport is standing by."
+        : "Practice setup changed. Realtime transport is standing by.",
+    blueprint,
   };
 }
 
@@ -160,7 +188,7 @@ export function interviewSessionReducer(
         return state;
       }
 
-      return resetForMode(state, action.mode);
+      return resetForBlueprint(state, action.blueprint);
     case "connection-requested":
       if (state.status === "connecting" || state.status === "live") {
         return state;
@@ -277,7 +305,7 @@ export function interviewSessionReducer(
         elapsedSeconds: state.elapsedSeconds,
       };
       const nextState = appendTranscriptTurn(state, candidateTurn);
-      const followUpState = buildNextQuestion(nextState);
+      const followUpState = advanceStage(nextState);
       const interviewerTurn: Omit<InterviewTranscriptTurn, "id"> = {
         speaker: "interviewer",
         text: followUpState.activePrompt,
@@ -290,7 +318,10 @@ export function interviewSessionReducer(
       return {
         ...appendTranscriptTurn(followUpState, interviewerTurn),
         draftResponse: "",
-        connectionMessage: "Candidate response captured and next follow-up queued.",
+        connectionMessage:
+          state.practiceStyle === "guided"
+            ? "Candidate response captured. The next guided checkpoint is ready."
+            : "Candidate response captured and the next follow-up is queued.",
       };
     }
     default:

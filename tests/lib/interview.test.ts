@@ -51,8 +51,8 @@ describe("interview domain helpers", () => {
 
     expect(trend).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ label: "Clarity", score: 85 }),
-        expect.objectContaining({ label: "Ownership", score: 75 }),
+        expect.objectContaining({ label: "Communication", score: 88 }),
+        expect.objectContaining({ label: "Ownership", score: 70 }),
       ]),
     );
   });

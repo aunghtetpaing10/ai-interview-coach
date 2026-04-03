@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRealtimeSessionSnapshot } from "@/lib/openai/realtime-session";
 import { createDemoInterviewSession } from "@/lib/interview-session/fixtures";
-import { getInterviewModePreset } from "@/lib/interview-session/catalog";
+import { getDefaultInterviewBlueprint } from "@/lib/interview-session/catalog";
 import {
   formatInterviewClock,
   getInterviewProgressPercent,
@@ -17,17 +17,21 @@ describe("interview session state", () => {
 
   it("resets the prompt ladder when the mode changes while idle", () => {
     const initial = createDemoInterviewSession();
+    const blueprint = getDefaultInterviewBlueprint({
+      mode: "behavioral",
+      practiceStyle: "live",
+      difficulty: "challenging",
+    });
     const next = interviewSessionReducer(initial, {
       type: "mode-changed",
-      mode: "behavioral",
+      blueprint,
     });
-    const preset = getInterviewModePreset("behavioral");
 
     expect(next.mode).toBe("behavioral");
     expect(next.status).toBe("idle");
-    expect(next.transcript[1].text).toBe(preset.openingPrompt);
-    expect(next.activePrompt).toBe(preset.openingPrompt);
-    expect(next.questionIndex).toBe(0);
+    expect(next.transcript[1].text).toBe(blueprint.openingPrompt);
+    expect(next.activePrompt).toBe(blueprint.openingPrompt);
+    expect(next.stageIndex).toBe(0);
   });
 
   it("connects, accepts a candidate response, and queues the next follow-up", () => {
@@ -50,7 +54,7 @@ describe("interview session state", () => {
     expect(afterSubmit.transcript.some((turn) => turn.speaker === "candidate")).toBe(
       true,
     );
-    expect(afterSubmit.activePrompt).toContain("hardest bottlenecks");
+    expect(afterSubmit.activePrompt).toContain("non-negotiable constraints");
   });
 
   it("ignores duplicate connection requests while the session is already starting or live", () => {
