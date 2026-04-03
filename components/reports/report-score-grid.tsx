@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { normalizeScorecard } from "@/lib/domain/interview";
 import type { InterviewReport } from "@/lib/reporting/types";
 
 type ReportScoreGridProps = {
@@ -8,9 +9,11 @@ type ReportScoreGridProps = {
 };
 
 export function ReportScoreGrid({ report }: ReportScoreGridProps) {
+  const scorecard = normalizeScorecard(report.scorecard);
+
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {report.scorecard.dimensions.map((dimension) => (
+      {scorecard.dimensions.map((dimension) => (
         <Card key={dimension.key} className="border-slate-200/60 bg-white/85">
           <CardHeader className="pb-3">
             <CardDescription className="uppercase tracking-[0.22em] text-slate-500">
