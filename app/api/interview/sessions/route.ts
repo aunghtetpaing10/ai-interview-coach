@@ -37,6 +37,10 @@ export async function POST(request: Request) {
     userId: user.id,
     targetRoleId: parsed.data.targetRoleId,
     mode: parsed.data.mode,
+    practiceStyle: parsed.data.practiceStyle,
+    difficulty: parsed.data.difficulty,
+    companyStyle: parsed.data.companyStyle ?? null,
+    questionId: parsed.data.questionId ?? null,
     title: parsed.data.title ?? `${targetRole.title} interview`,
     durationSeconds: parsed.data.durationSeconds,
   });

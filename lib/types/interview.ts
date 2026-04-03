@@ -1,6 +1,18 @@
-import type { InterviewMode } from "@/db/schema";
-export type { InterviewMode };
-export type CompetencyKey =
+import type {
+  CompanyStyle,
+  InterviewDifficulty,
+  InterviewMode,
+  PracticeStyle,
+} from "@/db/schema";
+
+export type {
+  CompanyStyle,
+  InterviewDifficulty,
+  InterviewMode,
+  PracticeStyle,
+};
+
+export type LegacyCompetencyKey =
   | "clarity"
   | "ownership"
   | "technical-depth"
@@ -8,6 +20,28 @@ export type CompetencyKey =
   | "systems-thinking";
 
 export type ScoreBand = "training" | "improving" | "ready";
+
+export interface ScoreDimension {
+  key: string;
+  label: string;
+  score: number;
+  evidenceSummary: string;
+}
+
+export interface Scorecard {
+  mode: InterviewMode;
+  overallScore: number;
+  rubricVersion: string;
+  dimensions: ScoreDimension[];
+}
+
+export interface LegacyScorecard {
+  mode: InterviewMode;
+  overallScore: number;
+  competencies: Record<LegacyCompetencyKey, number>;
+}
+
+export type StoredScorecard = Scorecard | LegacyScorecard;
 
 export interface UserProfile {
   id: string;
@@ -34,12 +68,6 @@ export interface TranscriptTurn {
   speaker: "interviewer" | "candidate";
   text: string;
   timestampSeconds: number;
-}
-
-export interface Scorecard {
-  mode: InterviewMode;
-  overallScore: number;
-  competencies: Record<CompetencyKey, number>;
 }
 
 export interface FeedbackReport {

@@ -22,7 +22,7 @@ import {
 } from "@/db/schema";
 import { deriveActiveMode } from "@/lib/data/active-mode";
 import { getDb } from "@/lib/db/client";
-import type { InterviewDataRepository } from "@/lib/data/repository";
+import { selectQuestionPreview, type InterviewDataRepository } from "@/lib/data/repository";
 
 export interface InterviewRepositoryStore {
   getProfile(userId: string): Promise<ProfileRow | null>;
@@ -63,17 +63,24 @@ export function createDatabaseInterviewRepository(
 
       const activeTargetRole =
         roles.find((targetRole) => targetRole.active) ?? roles[0] ?? null;
+      const activeMode = deriveActiveMode(sessions);
 
       return {
         profile,
         targetRole: activeTargetRole,
         jobTarget,
         resumeAsset,
-        activeMode: deriveActiveMode(sessions),
+        activeMode,
         questionCount: questions.length,
         rubricCount: rubrics.length,
         recentSessionCount: sessions.length,
-        questionPreview: questions.slice(0, 3),
+        questionPreview: selectQuestionPreview({
+          questions,
+          activeMode,
+          profile,
+          targetRole: activeTargetRole,
+          jobTarget,
+        }),
       };
     },
   };

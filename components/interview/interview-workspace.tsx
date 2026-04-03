@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Mic, MicOff, Pause, Play, Send, Square } from "lucide-react";
-import { getInterviewModePreset } from "@/lib/interview-session/catalog";
+import {
+  getDefaultInterviewBlueprint,
+  getInterviewModePreset,
+} from "@/lib/interview-session/catalog";
 import {
   formatInterviewClock,
   getInterviewProgressPercent,
@@ -46,6 +49,20 @@ function Metric({
   );
 }
 
+function buildModeHref(state: InterviewSessionState, mode: InterviewSessionState["mode"]) {
+  const search = new URLSearchParams({
+    mode,
+    practiceStyle: state.practiceStyle,
+    difficulty: state.difficulty,
+  });
+
+  if (state.companyStyle) {
+    search.set("companyStyle", state.companyStyle);
+  }
+
+  return `/interview?${search.toString()}`;
+}
+
 export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) {
   const [state, dispatch] = useReducer(interviewSessionReducer, initialSession);
   const [runtimeNotice, setRuntimeNotice] = useState<string | null>(null);
@@ -70,6 +87,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     state.status === "live" ||
     state.status === "paused";
   const startDisabled = state.status === "connecting" || state.status === "live";
+  const activeStage = state.blueprint.stages[state.stageIndex] ?? state.blueprint.stages[0];
 
   useEffect(() => {
     return () => {
@@ -105,8 +123,17 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
             candidateName: state.candidateName,
             targetRole: state.targetRole,
             mode: state.mode,
+            practiceStyle: state.practiceStyle,
+            difficulty: state.difficulty,
+            companyStyle: state.companyStyle,
+            questionId: state.questionId,
+            questionTitle: state.questionTitle,
+            stageIndex: state.stageIndex,
             focus: preset.focus,
+            interviewerGoal: state.blueprint.interviewerGoal,
+            followUpPolicy: state.blueprint.followUpPolicy,
             openingPrompt: state.activePrompt,
+            stageLabel: activeStage?.label ?? "Opening",
           },
           {
             audioElement: audioRef.current,
@@ -162,9 +189,18 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
     state.candidateName,
     state.targetRole,
     state.mode,
+    state.practiceStyle,
+    state.difficulty,
+    state.companyStyle,
+    state.questionId,
+    state.questionTitle,
+    state.stageIndex,
     state.activePrompt,
     state.microphoneEnabled,
+    activeStage?.label,
     preset.focus,
+    state.blueprint.interviewerGoal,
+    state.blueprint.followUpPolicy,
   ]);
 
   function handleSessionStart() {
@@ -251,10 +287,17 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
   }
 
   function handleModeChange(value: string) {
+    const nextMode = value as InterviewSessionState["mode"];
+    const nextBlueprint = getDefaultInterviewBlueprint({
+      mode: nextMode,
+      practiceStyle: state.practiceStyle,
+      difficulty: state.difficulty,
+      companyStyle: state.companyStyle,
+    });
     connectionRef.current?.close();
     connectionRef.current = null;
-    dispatch({ type: "mode-changed", mode: value as InterviewSessionState["mode"] });
-    router.push(`/interview?mode=${value}`);
+    dispatch({ type: "mode-changed", blueprint: nextBlueprint });
+    router.push(buildModeHref(state, nextMode));
   }
 
   async function handleSubmit() {
@@ -342,23 +385,26 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
               <Badge variant="secondary" className="rounded-full bg-white/10 text-white">
                 {preset.label}
               </Badge>
+              <Badge variant="secondary" className="rounded-full bg-white/10 text-white">
+                {state.practiceStyle}
+              </Badge>
             </div>
           </div>
           <div className="space-y-3">
             <p className="curator-kicker text-white/70">Live interview room</p>
             <CardTitle className="curator-display text-4xl text-white sm:text-5xl">
-              {state.candidateName} practicing for {state.targetRole}
+              {state.questionTitle}
             </CardTitle>
             <p className="max-w-3xl text-base leading-7 text-slate-300">
-              The Curator keeps the browser realtime connection, text fallback,
-              transcript persistence, and background report publishing in a single
-              editorial rehearsal loop.
+              {state.candidateName} is practicing for {state.targetRole} with a
+              blueprint-driven {state.practiceStyle} session that keeps the
+              transcript, stage progression, and report loop aligned.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             <Metric label="Elapsed" value={formatInterviewClock(state.elapsedSeconds)} />
             <Metric label="Remaining" value={formatInterviewClock(remainingSeconds)} />
-            <Metric label="Mode" value={preset.label} />
+            <Metric label="Stage" value={activeStage?.label ?? "Opening"} />
             <Metric label="Mic" value={state.microphoneEnabled ? "On" : "Muted"} />
           </div>
           <div className="space-y-2">
@@ -384,12 +430,13 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
                   Text fallback
                 </p>
                 <p className="mt-1 text-sm text-slate-300">
-                  Type a response and the reducer will queue the next interviewer
-                  follow-up.
+                  {state.practiceStyle === "guided"
+                    ? "Answer the current stage, then use the hint rail to tighten the next checkpoint."
+                    : "Type a response and the interviewer will continue probing without guided hints."}
                 </p>
               </div>
               <Badge className="rounded-full bg-white/10 text-white">
-                {state.status === "live" ? "live" : state.status}
+                {activeStage?.label ?? state.status}
               </Badge>
             </div>
 
@@ -401,7 +448,7 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
                   draftResponse: event.target.value,
                 })
               }
-              placeholder={`Draft your answer to: ${state.activePrompt}`}
+              placeholder={`Respond to ${activeStage?.label?.toLowerCase() ?? "the current stage"}: ${state.activePrompt}`}
               className="mt-4 min-h-32 border-white/10 bg-black/20 text-white placeholder:text-slate-500"
             />
 
@@ -507,12 +554,12 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
               Interview mode
             </Badge>
             <CardTitle className="text-2xl tracking-[-0.04em] text-[color:var(--curator-ink)]">
-              Switch the session lens
+              Switch the session track
             </CardTitle>
             <p className="text-sm leading-6 text-slate-600">
-              The reducer resets the prompt ladder when the session is idle, so
-              each mode starts with a clean transcript and the right follow-up
-              pattern.
+              The room resets only while idle, so each mode starts with a fresh
+              blueprint, the right prompt sequence, and the correct report
+              artifacts.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -521,38 +568,45 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
               onValueChange={handleModeChange}
               className="space-y-4"
             >
-              <TabsList className="grid w-full grid-cols-2 gap-2 bg-[rgba(20,63,134,0.08)] p-1 sm:grid-cols-4">
-                {["behavioral", "resume", "project", "system-design"].map((mode) => {
-                  const modePreset = getInterviewModePreset(
-                    mode as InterviewSessionState["mode"],
-                  );
+              <TabsList className="grid w-full grid-cols-2 gap-2 bg-[rgba(20,63,134,0.08)] p-1 sm:grid-cols-5">
+                {["behavioral", "coding", "resume", "project", "system-design"].map(
+                  (mode) => {
+                    const modePreset = getInterviewModePreset(
+                      mode as InterviewSessionState["mode"],
+                    );
 
-                  return (
-                    <TabsTrigger key={mode} value={mode} disabled={modeLocked}>
-                      {modePreset.label}
-                    </TabsTrigger>
-                  );
-                })}
+                    return (
+                      <TabsTrigger key={mode} value={mode} disabled={modeLocked}>
+                        {modePreset.label}
+                      </TabsTrigger>
+                    );
+                  },
+                )}
               </TabsList>
             </Tabs>
             <div className="rounded-[1.5rem] border border-[color:var(--curator-line)] bg-white/80 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--curator-orange)]">
-                Focus area
+                Current blueprint
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-700">
                 {preset.focus}
               </p>
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                {preset.closingPrompt}
+                {state.blueprint.followUpPolicy}
               </p>
             </div>
             <div className="grid gap-2">
-              {preset.followUpPrompts.map((prompt) => (
+              {state.blueprint.stages.map((stage, index) => (
                 <div
-                  key={prompt}
-                  className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3 text-sm leading-6 text-slate-700"
+                  key={stage.id}
+                  className={cn(
+                    "rounded-[1.35rem] border p-3 text-sm leading-6",
+                    index === state.stageIndex
+                      ? "border-[color:var(--curator-navy)] bg-[rgba(20,63,134,0.08)] text-[color:var(--curator-ink)]"
+                      : "border-[color:var(--curator-line)] bg-white/80 text-slate-700",
+                  )}
                 >
-                  {prompt}
+                  <strong>{stage.label}:</strong> {stage.prompt}
                 </div>
               ))}
             </div>
@@ -575,28 +629,32 @@ export function InterviewWorkspace({ initialSession }: InterviewWorkspaceProps) 
         <Card className="curator-card">
           <CardHeader className="space-y-4">
             <Badge className="w-fit rounded-full bg-[rgba(20,63,134,0.12)] text-[color:var(--curator-navy)]">
-              Session notes
+              Stage notes
             </Badge>
             <CardTitle className="text-2xl tracking-[-0.04em] text-[color:var(--curator-ink)]">
-              UI integration points
+              {state.practiceStyle === "guided" ? "Guided hint rail" : "Live pressure rail"}
             </CardTitle>
             <p className="text-sm leading-6 text-slate-600">
-              This shell negotiates a real OpenAI Realtime transport in the
-              browser and keeps the text fallback path available when voice
-              setup is unavailable while the report publishes in the background
-              after the session ends.
+              {state.practiceStyle === "guided"
+                ? "Guided drills expose the next coaching cue directly in the room."
+                : "Live mocks keep the interviewer tighter and withhold explicit hints."}
             </p>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-slate-700">
             <div className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3">
-              <strong>Transport:</strong> {state.realtime.provider}
+              <strong>Question:</strong> {state.questionTitle}
             </div>
             <div className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3">
-              <strong>Route:</strong> {state.sessionId}
+              <strong>Current stage:</strong> {activeStage?.label ?? "Opening"}
             </div>
             <div className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3">
-              <strong>Prompt ladder:</strong> {state.questionIndex + 1} turns
-              generated from the current mode preset.
+              <strong>{state.practiceStyle === "guided" ? "Hint" : "Guardrail"}:</strong>{" "}
+              {state.practiceStyle === "guided"
+                ? activeStage?.hint
+                : "The interviewer should challenge the answer without revealing the missing solution or structure."}
+            </div>
+            <div className="rounded-[1.35rem] border border-[color:var(--curator-line)] bg-white/80 p-3">
+              <strong>Coaching outline:</strong> {state.blueprint.coachingOutline.join(" | ")}
             </div>
             <Link
               href="/dashboard"

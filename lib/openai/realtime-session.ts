@@ -1,19 +1,38 @@
 import OpenAI from "openai";
 import { getEnv } from "@/lib/env";
-import { getInterviewModeLabel } from "@/lib/domain/interview";
+import {
+  getCompanyStyleLabel,
+  getInterviewDifficultyLabel,
+  getInterviewModeLabel,
+  getPracticeStyleLabel,
+} from "@/lib/domain/interview";
 import type { ClientSecretCreateParams, ClientSecretCreateResponse } from "openai/resources/realtime/client-secrets";
 import type {
   RealtimeAudioConfigOutput,
   RealtimeSessionCreateRequest,
 } from "openai/resources/realtime/realtime";
-import type { InterviewMode } from "@/lib/types/interview";
+import type {
+  CompanyStyle,
+  InterviewDifficulty,
+  InterviewMode,
+  PracticeStyle,
+} from "@/lib/types/interview";
 import type { RealtimeSessionSnapshot } from "@/lib/interview-session/types";
 
 export interface RealtimeSessionConfigInput {
   candidateName: string;
   targetRole: string;
   mode: InterviewMode;
+  practiceStyle: PracticeStyle;
+  difficulty: InterviewDifficulty;
+  companyStyle: CompanyStyle | null;
+  questionId: string;
+  questionTitle: string;
+  stageIndex: number;
+  stageLabel: string;
   focus: string;
+  interviewerGoal: string;
+  followUpPolicy: string;
   openingPrompt: string;
 }
 
@@ -85,23 +104,26 @@ export function createRealtimeSessionSnapshot(): RealtimeSessionSnapshot {
   };
 }
 
-export function buildRealtimeInstructions(input: {
-  candidateName: string;
-  targetRole: string;
-  mode: InterviewMode;
-  focus: string;
-  openingPrompt: string;
-}) {
+export function buildRealtimeInstructions(input: RealtimeSessionConfigInput) {
   return [
     `You are a senior interviewer coaching ${input.candidateName} for ${input.targetRole}.`,
     `Interview mode: ${getInterviewModeLabel(input.mode)}.`,
+    `Practice style: ${getPracticeStyleLabel(input.practiceStyle)}.`,
+    `Difficulty: ${getInterviewDifficultyLabel(input.difficulty)}.`,
+    `Company style: ${input.companyStyle ? getCompanyStyleLabel(input.companyStyle) : "Generalist"}.`,
+    `Question id: ${input.questionId}.`,
+    `Question title: ${input.questionTitle}.`,
+    `Current stage: ${input.stageLabel} (${input.stageIndex + 1}).`,
     `Focus area: ${input.focus}.`,
+    `Interviewer goal: ${input.interviewerGoal}.`,
+    `Follow-up policy: ${input.followUpPolicy}.`,
     `Opening prompt: ${input.openingPrompt}.`,
     "",
     "Behavior:",
     "- Keep follow-ups short, specific, and evidence-based.",
     "- Ground every question in the candidate's transcript and resume claims.",
     "- Ask for concrete tradeoffs, ownership, and outcomes.",
+    "- Guided mode can scaffold the answer structure, but live mode must not reveal the solution.",
     "- If voice transport is unavailable, continue the same interview flow in text mode.",
   ].join("\n");
 }

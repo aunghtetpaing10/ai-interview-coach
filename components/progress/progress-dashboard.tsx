@@ -124,7 +124,11 @@ export function ProgressDashboard({
                 </div>
                 <Progress value={snapshot.latestSession.score} className="mt-3 h-2.5" />
                 <div className="mt-4 flex items-center justify-between text-sm text-slate-300">
-                  <span>{snapshot.latestSession.track}</span>
+                  <span>
+                    {snapshot.trackSummaries.find(
+                      (track) => track.track === snapshot.latestSession.track,
+                    )?.label ?? snapshot.latestSession.track}
+                  </span>
                   <span>{snapshot.latestSession.durationMinutes} min</span>
                 </div>
               </div>
@@ -202,7 +206,7 @@ export function ProgressDashboard({
             </CardHeader>
             <CardContent>
               <Tabs defaultValue={snapshot.trackSummaries[0].track} className="space-y-5">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                   {snapshot.trackSummaries.map((track) => (
                     <TabsTrigger key={track.track} value={track.track}>
                       {track.label}

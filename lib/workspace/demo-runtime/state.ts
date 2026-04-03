@@ -218,8 +218,6 @@ type SerializedDemoWorkspaceStateEnvelopeV1 = {
   state: SerializedDemoWorkspaceState;
 };
 
-type DemoRuntimeStateFile = SerializedDemoWorkspaceStateEnvelopeV1 | SerializedDemoWorkspaceState;
-
 function createInitialState(): DemoWorkspaceState {
   const draft = createDemoOnboardingDraft();
   const now = nextTimestamp(0);
@@ -242,7 +240,6 @@ function createInitialState(): DemoWorkspaceState {
 
 let inMemoryState = createInitialState();
 let persistedState: DemoWorkspaceState | null = null;
-let persistedStatePath: string | null = null;
 
 function getDemoRuntimeStatePath() {
   const statePath = process.env.E2E_DEMO_STATE_PATH?.trim();
@@ -666,12 +663,10 @@ export class DemoRuntime {
     const loadedState = loadStateFromFile(statePath);
     if (loadedState) {
       persistedState = loadedState;
-      persistedStatePath = statePath;
       return loadedState;
     }
 
     persistedState = createInitialState();
-    persistedStatePath = statePath;
 
     return persistedState;
   }
@@ -685,7 +680,6 @@ export class DemoRuntime {
     }
 
     persistedState = state;
-    persistedStatePath = statePath;
     mkdirSync(dirname(statePath), { recursive: true });
     const tempPath = join(
       dirname(statePath),

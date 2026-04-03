@@ -78,6 +78,8 @@ export function createDatabaseInterviewSessionStore(): DatabaseInterviewSessionS
             eq(interviewSessions.userId, input.userId),
             eq(interviewSessions.targetRoleId, input.targetRoleId),
             eq(interviewSessions.mode, input.mode),
+            eq(interviewSessions.practiceStyle, input.practiceStyle ?? "live"),
+            eq(interviewSessions.difficulty, input.difficulty ?? "standard"),
           ),
         )
         .orderBy(desc(interviewSessions.updatedAt))
@@ -85,7 +87,11 @@ export function createDatabaseInterviewSessionStore(): DatabaseInterviewSessionS
 
       return (
         sessions.find(
-          (session) => session.status !== "completed" && session.status !== "archived",
+          (session) =>
+            session.status !== "completed" &&
+            session.status !== "archived" &&
+            (input.companyStyle ?? null) === (session.companyStyle ?? null) &&
+            (input.questionId ?? null) === (session.questionId ?? null),
         ) ?? null
       );
     },

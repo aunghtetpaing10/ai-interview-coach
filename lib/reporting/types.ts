@@ -1,4 +1,10 @@
-import type { Scorecard, TranscriptTurn } from "@/lib/types/interview";
+import type {
+  CompanyStyle,
+  InterviewDifficulty,
+  PracticeStyle,
+  Scorecard,
+  TranscriptTurn,
+} from "@/lib/types/interview";
 
 export type ReportBand = "ready" | "strong" | "steady" | "watch";
 
@@ -80,6 +86,24 @@ export interface ReportEvalCase {
   expected: string[];
 }
 
+export interface ReportArtifactItem {
+  title: string;
+  detail: string;
+}
+
+export interface ReportArtifactSection {
+  id: string;
+  title: string;
+  description: string;
+  items: ReportArtifactItem[];
+}
+
+export interface ReportReplayAction {
+  label: string;
+  href: string;
+  description: string;
+}
+
 export interface ReportOverview {
   id: string;
   title: string;
@@ -98,4 +122,11 @@ export interface InterviewReport extends ReportOverview {
   citations: CitationBlock[];
   rewrites: AnswerRewrite[];
   practicePlan: PracticePlan;
+  practiceStyle: PracticeStyle;
+  difficulty: InterviewDifficulty;
+  companyStyle: CompanyStyle | null;
+  questionId: string | null;
+  questionFamily: string | null;
+  artifactSections: ReportArtifactSection[];
+  replayActions: ReportReplayAction[];
 }

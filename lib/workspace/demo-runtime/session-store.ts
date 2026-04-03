@@ -41,6 +41,10 @@ export function createDemoInterviewSessionStore(): InterviewSessionStore {
           session.userId === input.userId &&
           session.targetRoleId === input.targetRoleId &&
           session.mode === input.mode &&
+          session.practiceStyle === (input.practiceStyle ?? "live") &&
+          session.difficulty === (input.difficulty ?? "standard") &&
+          (session.companyStyle ?? null) === (input.companyStyle ?? null) &&
+          (session.questionId ?? null) === (input.questionId ?? null) &&
           session.status !== "completed" &&
           session.status !== "archived",
       );
@@ -54,6 +58,10 @@ export function createDemoInterviewSessionStore(): InterviewSessionStore {
           session.userId === row.userId &&
           session.targetRoleId === row.targetRoleId &&
           session.mode === row.mode &&
+          session.practiceStyle === (row.practiceStyle ?? "live") &&
+          session.difficulty === (row.difficulty ?? "standard") &&
+          (session.companyStyle ?? null) === (row.companyStyle ?? null) &&
+          (session.questionId ?? null) === (row.questionId ?? null) &&
           session.status !== "completed" &&
           session.status !== "archived",
       );
@@ -74,6 +82,10 @@ export function createDemoInterviewSessionStore(): InterviewSessionStore {
         userId: row.userId,
         targetRoleId: row.targetRoleId,
         mode: row.mode,
+        practiceStyle: row.practiceStyle ?? "live",
+        difficulty: row.difficulty ?? "standard",
+        companyStyle: row.companyStyle ?? null,
+        questionId: row.questionId ?? null,
         status,
         title: row.title,
         overallScore,

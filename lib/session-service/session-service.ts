@@ -5,7 +5,12 @@ import type {
   TargetRoleRow,
   TranscriptTurnRow,
 } from "@/db/schema";
-import type { InterviewMode } from "@/lib/types/interview";
+import type {
+  CompanyStyle,
+  InterviewDifficulty,
+  InterviewMode,
+  PracticeStyle,
+} from "@/lib/types/interview";
 
 export interface InterviewSessionStore {
   getTargetRoleById(userId: string, targetRoleId: string): Promise<TargetRoleRow | null>;
@@ -13,6 +18,10 @@ export interface InterviewSessionStore {
     userId: string;
     targetRoleId: string;
     mode: InterviewMode;
+    practiceStyle?: PracticeStyle;
+    difficulty?: InterviewDifficulty;
+    companyStyle?: CompanyStyle | null;
+    questionId?: string | null;
   }): Promise<InterviewSessionRow | null>;
   createSession(row: NewInterviewSessionRow): Promise<InterviewSessionRow>;
   getSession(userId: string, sessionId: string): Promise<InterviewSessionRow | null>;
@@ -30,6 +39,10 @@ export interface CreateInterviewSessionInput {
   userId: string;
   targetRoleId: string;
   mode: InterviewMode;
+  practiceStyle?: PracticeStyle;
+  difficulty?: InterviewDifficulty;
+  companyStyle?: CompanyStyle | null;
+  questionId?: string | null;
   title: string;
   durationSeconds?: number;
 }
@@ -111,6 +124,10 @@ export function createInterviewSessionService(store: InterviewSessionStore) {
         userId: input.userId,
         targetRoleId: input.targetRoleId,
         mode: input.mode,
+        practiceStyle: input.practiceStyle,
+        difficulty: input.difficulty,
+        companyStyle: input.companyStyle ?? null,
+        questionId: input.questionId ?? null,
         status: "draft",
         title: input.title,
         overallScore: null,
@@ -146,6 +163,10 @@ export function createInterviewSessionService(store: InterviewSessionStore) {
         userId: input.userId,
         targetRoleId: input.targetRoleId,
         mode: input.mode,
+        practiceStyle: input.practiceStyle,
+        difficulty: input.difficulty,
+        companyStyle: input.companyStyle ?? null,
+        questionId: input.questionId ?? null,
       });
       const session =
         existingSession ??
@@ -153,6 +174,10 @@ export function createInterviewSessionService(store: InterviewSessionStore) {
           userId: input.userId,
           targetRoleId: input.targetRoleId,
           mode: input.mode,
+          practiceStyle: input.practiceStyle,
+          difficulty: input.difficulty,
+          companyStyle: input.companyStyle ?? null,
+          questionId: input.questionId ?? null,
           status: "draft",
           title: input.title,
           overallScore: null,

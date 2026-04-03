@@ -3,6 +3,7 @@ import "server-only";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
+import { getModeDimensionTemplates, getModeRubricVersion } from "@/lib/domain/interview";
 import { getEnv, isE2EDemoMode } from "@/lib/env";
 import { buildCitationBlocks, generatePracticePlan, rewriteAnswerDraft, summarizeScorecard } from "@/lib/reporting/reporting";
 import type {
@@ -20,15 +21,17 @@ const MAX_REPORT_EVALUATION_CONTEXT_CHARS = 6_000;
 const scoreBandSchema = z.enum(["ready", "strong", "steady", "watch"]);
 
 const scorecardSchema = z.object({
-  mode: z.enum(["behavioral", "resume", "project", "system-design"]),
+  mode: z.enum(["behavioral", "coding", "resume", "project", "system-design"]),
   overallScore: z.number().int().min(0).max(100),
-  competencies: z.object({
-    clarity: z.number().int().min(0).max(100),
-    ownership: z.number().int().min(0).max(100),
-    "technical-depth": z.number().int().min(0).max(100),
-    communication: z.number().int().min(0).max(100),
-    "systems-thinking": z.number().int().min(0).max(100),
-  }),
+  rubricVersion: z.string().min(1),
+  dimensions: z.array(
+    z.object({
+      key: z.string().min(1),
+      label: z.string().min(1),
+      score: z.number().int().min(0).max(100),
+      evidenceSummary: z.string().min(1),
+    }),
+  ).min(1),
 });
 
 const scorecardSummarySchema = z.object({
@@ -422,21 +425,47 @@ function buildGeneratedScorecard(
 ): Scorecard {
   const candidateTurnCount = transcript.filter((turn) => turn.speaker === "candidate").length;
   const baseScore = normalizeScore(
-    session.overallScore ?? 68 + candidateTurnCount * 2 + (session.mode === "system-design" ? 4 : 0),
+    session.overallScore ??
+      68 +
+        candidateTurnCount * 2 +
+        (session.mode === "system-design" ? 4 : 0) +
+        (session.mode === "coding" ? 3 : 0),
   );
+  const dimensionOffsets: Record<string, number> = {
+    structure: 2,
+    ownership: -3,
+    impact: 1,
+    communication: 0,
+    adaptability: -1,
+    "problem-framing": 2,
+    "solution-design": 3,
+    correctness: 1,
+    testing: -2,
+    optimization: -1,
+    credibility: 1,
+    scope: -1,
+    "decision-quality": 2,
+    "technical-depth": 3,
+    requirements: -2,
+    architecture: 4,
+    "api-data-model": 1,
+    scalability: 2,
+    reliability: -1,
+    "trade-offs": 0,
+  };
 
   return {
     mode: session.mode,
     overallScore: baseScore,
-    competencies: {
-      clarity: normalizeScore(baseScore + 1),
-      ownership: normalizeScore(baseScore - 4),
-      "technical-depth": normalizeScore(
-        baseScore + (session.mode === "system-design" ? 6 : session.mode === "project" ? 4 : 2),
-      ),
-      communication: normalizeScore(baseScore - 1),
-      "systems-thinking": normalizeScore(baseScore - 2),
-    },
+    rubricVersion: getModeRubricVersion(session.mode),
+    dimensions: getModeDimensionTemplates(session.mode).map((dimension) => ({
+      key: dimension.key,
+      label: dimension.label,
+      score: normalizeScore(baseScore + (dimensionOffsets[dimension.key] ?? 0)),
+      evidenceSummary:
+        transcript.find((turn) => turn.speaker === "candidate")?.text ??
+        `The transcript has limited direct evidence for ${dimension.label.toLowerCase()}.`,
+    })),
   };
 }
 

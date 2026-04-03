@@ -4,6 +4,7 @@ import type { ScoreBand } from "@/lib/types/interview";
 
 export type ProgressTrack =
   | "behavioral"
+  | "coding"
   | "resume"
   | "project"
   | "system-design";
@@ -53,6 +54,7 @@ export interface ProgressDashboardSnapshot {
 
 const TRACK_LABELS: Record<ProgressTrack, string> = {
   behavioral: "Behavioral",
+  coding: "Coding",
   resume: "Resume deep dive",
   project: "Project walkthrough",
   "system-design": "System design",
@@ -103,12 +105,12 @@ export const PROGRESS_SESSIONS: ProgressSession[] = [
   {
     id: "session-03",
     completedAt: "2026-03-05T18:15:00.000Z",
-    track: "project",
+    track: "coding",
     score: 71,
     durationMinutes: 22,
     followUps: 5,
-    focus: "tradeoff clarity",
-    note: "Architecture choices are present, but the tradeoffs need to be stated earlier.",
+    focus: "edge-case coverage",
+    note: "The algorithm direction is solid, but the answer still skips edge cases too early.",
   },
   {
     id: "session-04",
@@ -169,6 +171,16 @@ export const PROGRESS_SESSIONS: ProgressSession[] = [
     followUps: 8,
     focus: "tradeoff framing",
     note: "The answer now leads with capacity, bottlenecks, and failure domains.",
+  },
+  {
+    id: "session-10",
+    completedAt: "2026-03-20T18:15:00.000Z",
+    track: "coding",
+    score: 85,
+    durationMinutes: 27,
+    followUps: 7,
+    focus: "complexity tradeoffs",
+    note: "The candidate now clarifies constraints, tests edge cases, and explains optimization choices.",
   },
 ];
 

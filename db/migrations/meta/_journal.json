@@ -36,6 +36,13 @@
       "when": 1774636800000,
       "tag": "0004_security_session_report_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775194814973,
+      "tag": "0005_mature_harpoon",
+      "breakpoints": true
     }
   ]
 }
